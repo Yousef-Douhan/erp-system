@@ -1,0 +1,99 @@
+models:
+  Organization:
+    name: string
+    currency: string:3
+    timezone: string:nullable
+    status: string
+    timestamps: true
+
+  Branch:
+    organization_id: foreignId
+    name: string
+    type: string
+    phone: string:nullable
+    address: text:nullable
+    status: string
+    timestamps: true
+
+  Category:
+    organization_id: foreignId
+    parent_id: foreignId:nullable
+    name: string
+    is_active: boolean
+    timestamps: true
+
+  Product:
+    organization_id: foreignId
+    category_id: foreignId
+    name: string
+    sku: string:unique
+    track_expiry: boolean
+    is_controlled: boolean
+    is_active: boolean
+    timestamps: true
+
+  ProductBatch:
+    product_id: foreignId
+    warehouse_id: foreignId
+    batch_number: string
+    expiry_date: date
+    cost_price: decimal:15,2
+    selling_price: decimal:15,2
+    quantity: integer
+    timestamps: true
+
+  Customer:
+    organization_id: foreignId
+    name: string
+    phone: string:nullable
+    balance: decimal:15,2
+    credit_limit: decimal:15,2
+    timestamps: true
+
+  Sale:
+    organization_id: foreignId
+    branch_id: foreignId
+    customer_id: foreignId:nullable
+    invoice_number: string:unique
+    total: decimal:15,2
+    paid_amount: decimal:15,2
+    status: string
+    timestamps: true
+
+  SaleItem:
+    sale_id: foreignId
+    product_id: foreignId
+    batch_id: foreignId:nullable
+    quantity: integer
+    unit_price: decimal:15,2
+    discount: decimal:15,2
+    total: decimal:15,2
+
+  Prescription:
+    customer_id: foreignId
+    doctor_name: string
+    diagnosis: text:nullable
+    image_path: string:nullable
+    is_filled: boolean
+    timestamps: true
+
+  Account:
+    organization_id: foreignId
+    parent_id: foreignId:nullable
+    name: string
+    account_code: string
+    account_type: string
+    timestamps: true
+
+  JournalEntry:
+    organization_id: foreignId
+    entry_number: string
+    entry_date: date
+    description: text:nullable
+    timestamps: true
+
+  JournalEntryLine:
+    journal_entry_id: foreignId
+    account_id: foreignId
+    debit: decimal:15,2
+    credit: decimal:15,2
