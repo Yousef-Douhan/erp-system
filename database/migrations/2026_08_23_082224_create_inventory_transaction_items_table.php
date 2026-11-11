@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('inventory_transaction_items', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('inventory_transaction_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('inventory_transaction_id'); // القيد يضاف لاحقاً في fix_foreign_keys
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
             $table->integer('quantity');
             $table->decimal('purchase_price', 10, 2)->nullable(); // سعر الشراء للوارد

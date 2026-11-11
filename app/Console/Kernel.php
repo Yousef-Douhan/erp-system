@@ -14,7 +14,10 @@ class Kernel extends ConsoleKernel
     {
         // $schedule->command('inspire')->hourly();
 
-        $schedule->command('stock:check-low')->daily();
+        // ملخص يومي بالنواقص والصلاحية + نسخة احتياطية يومية
+        // (على Windows يجب تشغيل "php artisan schedule:run" كل دقيقة من Task Scheduler — راجع docs/DEPLOYMENT.md)
+        $schedule->command('alerts:daily')->dailyAt(config('backup.alerts_time', '07:30'))->withoutOverlapping();
+        $schedule->command('backup:run')->dailyAt(config('backup.time', '23:30'))->withoutOverlapping();
     }
 
     /**

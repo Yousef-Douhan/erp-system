@@ -18,7 +18,7 @@ class CashRegisterController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'branch_id' => 'required|exists:branches,id',
+            'branch_id' => 'required|exists:branches,id,deleted_at,NULL',
             'name' => 'required|string|max:255',
             'opening_balance' => 'required|numeric|min:0',
             'status' => 'required|string',
@@ -35,7 +35,7 @@ class CashRegisterController extends Controller
     public function update(Request $request, CashRegister $cashRegister)
     {
         $validated = $request->validate([
-            'branch_id' => 'required|exists:branches,id',
+            'branch_id' => 'required|exists:branches,id,deleted_at,NULL',
             'name' => 'required|string|max:255',
             'status' => 'required|string',
         ]);

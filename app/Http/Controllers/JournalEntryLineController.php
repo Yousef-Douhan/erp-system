@@ -10,8 +10,8 @@ class JournalEntryLineController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'journal_entry_id' => 'required|exists:journal_entries,id',
-            'account_id' => 'required|exists:accounts,id',
+            'journal_entry_id' => 'required|exists:journal_entries,id,deleted_at,NULL',
+            'account_id' => 'required|exists:accounts,id,deleted_at,NULL',
             'debit' => 'required|numeric|min:0',
             'credit' => 'required|numeric|min:0',
         ]);

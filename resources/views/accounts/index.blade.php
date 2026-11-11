@@ -25,7 +25,7 @@
             <div class="mb-4">
                 <label class="block text-xs font-bold text-slate-600 mb-1">المنظمة التابعة لها</label>
                 <select name="organization_id" required class="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
-                    @foreach(\App\Models\Organization::all() as $org)
+                    @foreach($organizations as $org)
                         <option value="{{ $org->id }}">{{ $org->name }}</option>
                     @endforeach
                 </select>
@@ -36,7 +36,7 @@
                 <label class="block text-xs font-bold text-slate-600 mb-1">الحساب الرئيسي (اختياري)</label>
                 <select id="parent_id" name="parent_id" class="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
                     <option value="">-- بدون حساب رئيسي (حساب رئيسي جذري) --</option>
-                    @foreach(\App\Models\Account::whereNull('parent_id')->get() as $parentAcc)
+                    @foreach($parentAccounts as $parentAcc)
                         <option value="{{ $parentAcc->id }}">{{ $parentAcc->name }} ({{ $parentAcc->account_code }})</option>
                     @endforeach
                 </select>
@@ -110,7 +110,7 @@
 <script>
     function editItem(id, name, code, type, parentId, organizationId) {
         const form = document.getElementById('crud-form');
-        form.action = `/accounts/${id}`;
+        form.action = `{{ url('accounts') }}/${id}`;
         document.getElementById('form-method').value = 'PUT';
         
         document.getElementById('name').value = name;
@@ -148,4 +148,4 @@
         document.getElementById('cancel-btn').classList.add('hidden');
     }
 </script>
-@endsection
+@endsection

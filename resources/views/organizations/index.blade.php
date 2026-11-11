@@ -5,18 +5,20 @@
     <!-- رأس الصفحة مع زر الإضافة -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-            <h2 class="text-xl font-bold text-slate-800">إدارة المنظمات (Organizations)</h2>
+            <h2 class="text-xl font-bold text-slate-800">إدارة الصيدليات </h2>
             <p class="text-xs text-slate-500">إدارة الشركات والكيانات الرئيسية المرتبطة بالنظام.</p>
         </div>
         
+        @if (\App\Support\Tenancy::isSuperAdmin())
         <!-- زر فتح نافذة الإضافة -->
         <button type="button" onclick="openModal('createModal')" 
             class="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-sm shadow-indigo-100 transition-all">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
             </svg>
-            إضافة منظمة جديدة
+            إضافة صيدلية جديدة
         </button>
+        @endif
     </div>
 
     <!-- رسائل التنبيه والخطأ -->
@@ -37,14 +39,14 @@
         </div>
     @endif
 
-    <!-- جدول عرض المنظمات -->
+    <!-- جدول عرض الصيدليات -->
     <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-right border-collapse">
                 <thead>
                     <tr class="bg-slate-50/70 border-b border-slate-200 text-slate-500 text-xs font-semibold uppercase tracking-wider">
                         <th class="py-3.5 px-6">#</th>
-                        <th class="py-3.5 px-6">اسم المنظمة</th>
+                        <th class="py-3.5 px-6">اسم الصيدلية</th>
                         <th class="py-3.5 px-6">العملة</th>
                         <th class="py-3.5 px-6">المنطقة الزمنية</th>
                         <th class="py-3.5 px-6">الحالة</th>
@@ -73,14 +75,16 @@
                             </button>
 
                             <!-- زر الحذف -->
+                            @if (\App\Support\Tenancy::isSuperAdmin())
                             <form action="{{ route('organizations.destroy', $org->id) }}" method="POST" class="inline-block">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" onclick="return confirm('هل أنت متأكد من حذف هذه المنظمة؟')" 
+                                <button type="submit" onclick="return confirm('هل أنت متأكد من حذف هذه الصيدلية؟')" 
                                     class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-xs font-semibold transition-all">
                                     حذف
                                 </button>
                             </form>
+                            @endif
                         </td>
                     </tr>
 
@@ -88,7 +92,7 @@
                     <div id="editModal{{ $org->id }}" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
                         <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-150">
                             <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                                <h3 class="font-bold text-slate-800 text-sm">تعديل المنظمة: {{ $org->name }}</h3>
+                                <h3 class="font-bold text-slate-800 text-sm">تعديل الصيدلية: {{ $org->name }}</h3>
                                 <button onclick="closeModal('editModal{{ $org->id }}')" class="text-slate-400 hover:text-slate-600 font-bold">&times;</button>
                             </div>
                             <form action="{{ route('organizations.update', $org->id) }}" method="POST">
@@ -96,7 +100,7 @@
                                 @method('PUT')
                                 <div class="p-6 space-y-4">
                                     <div>
-                                        <label class="block text-xs font-bold text-slate-700 mb-1">اسم المنظمة</label>
+                                        <label class="block text-xs font-bold text-slate-700 mb-1">اسم الصيدلية</label>
                                         <input type="text" name="name" value="{{ $org->name }}" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                                     </div>
                                     <div>
@@ -129,6 +133,7 @@
                     @endforelse
                 </tbody>
             </table>
+<div class="p-4">{{ $organizations->links() }}</div>
         </div>
     </div>
 </div>
@@ -137,15 +142,15 @@
 <div id="createModal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
         <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-            <h3 class="font-bold text-slate-800 text-sm">إضافة منظمة جديدة</h3>
+            <h3 class="font-bold text-slate-800 text-sm">إضافة صيدلية جديدة</h3>
             <button onclick="closeModal('createModal')" class="text-slate-400 hover:text-slate-600 font-bold">&times;</button>
         </div>
         <form action="{{ route('organizations.store') }}" method="POST">
             @csrf
             <div class="p-6 space-y-4">
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">اسم المنظمة</label>
-                    <input type="text" name="name" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="أدخل اسم المنظمة">
+                    <label class="block text-xs font-bold text-slate-700 mb-1">اسم الصيدلية</label>
+                    <input type="text" name="name" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="أدخل اسم الصيدلية">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">العملة</label>
@@ -165,7 +170,7 @@
             </div>
             <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
                 <button type="button" onclick="closeModal('createModal')" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-semibold">إلغاء</button>
-                <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold">حفظ المنظمة</button>
+                <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold">حفظ الصيدلية</button>
             </div>
         </form>
     </div>

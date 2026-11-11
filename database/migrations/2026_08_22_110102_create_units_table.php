@@ -14,7 +14,7 @@ return new class extends Migration
             $table->string('short_name')->nullable(); // الاختصار (مثل: box, strip, pcs)
             $table->text('description')->nullable(); // الوصف
             $table->boolean('is_active')->default(true); // الحالة
-            $table->foreignId('organization_id')->constrained(); // ربط بالمنشأة
+            $table->foreignId('organization_id'); // ربط بالمنشأة (القيد يضاف في migration fix_foreign_keys لأن جدول organizations يُنشأ لاحقاً)
             $table->timestamps();
         });
     }

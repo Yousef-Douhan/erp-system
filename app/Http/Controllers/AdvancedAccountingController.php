@@ -3,167 +3,204 @@
 namespace App\Http\Controllers;
 
 use App\Models\Account;
-use App\Models\JournalEntry;
-use App\Models\JournalEntryLine;
-use App\Models\CustomerAccount;
-use App\Models\SupplierAccount;
 use App\Models\CashRegister;
+use App\Models\Customer;
+use App\Models\Supplier;
+use App\Models\SupplierAccount;
+use App\Services\AccountingService;
+use App\Services\CustomerLedger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class AdvancedAccountingController extends Controller
 {
     /**
-     * 1. سند قبض (Receipt Voucher) - قبض نقدية من عميل أو إيراد
+     * 1. سند قبض (Receipt Voucher) - قبض نقدية من عميل أو إيراد آخر
+     * القيد: من حـ/ الصندوق  إلى حـ/ ذمم العملاء (أو إيرادات أخرى)
      */
     public function storeReceiptVoucher(Request $request)
     {
         $request->validate([
-            'organization_id' => 'required|exists:organizations,id',
-            'cash_register_id' => 'required|exists:cash_registers,id',
-            'customer_id' => 'nullable|exists:customers,id',
-            'amount' => 'required|numeric|min:0.01',
-            'description' => 'required|string',
+            'organization_id'  => 'required|exists:organizations,id,deleted_at,NULL',
+            'cash_register_id' => 'required|exists:cash_registers,id,deleted_at,NULL',
+            'customer_id'      => 'nullable|exists:customers,id,deleted_at,NULL',
+            'amount'           => 'required|numeric|min:0.01',
+            'description'      => 'required|string',
         ]);
 
         try {
-            DB::beginTransaction();
+            DB::transaction(function () use ($request) {
+                $orgId = \App\Support\Tenancy::orgId() ?? (int) $request->organization_id;
+                $amount = (float) $request->amount;
 
-            // 1. إنشاء قيد يومي تلقائي (من مذكورين / إلى مذكورين)
-            $entry = JournalEntry::create([
-                'organization_id' => $request->organization_id,
-                'entry_number' => 'RV-' . date('Ymd') . '-' . rand(1000, 9999),
-                'entry_date' => now(),
-                'description' => 'سند قبض: ' . $request->description,
-                'ref_type' => 'receipt_voucher',
-                'ref_id' => null,
-            ]);
+                $cash = AccountingService::systemAccount(AccountingService::CASH, $orgId);
+                $creditAccount = $request->customer_id
+                    ? AccountingService::systemAccount(AccountingService::RECEIVABLES, $orgId)
+                    : AccountingService::systemAccount(AccountingService::OTHER_INCOME, $orgId);
 
-            // فرضا: الخزينة مدينة (زيادة النقدية)
-            // نحتاج حساب الخزينة وحساب العميل من دليل الحسابات (Accounts)
-            // للتسهيل، سنفترض ربطها بأكواد افتراضية أو تمريرها
+                AccountingService::post($orgId, 'سند قبض: ' . $request->description, [
+                    ['account_id' => $cash->id, 'debit' => $amount, 'credit' => 0],
+                    ['account_id' => $creditAccount->id, 'debit' => 0, 'credit' => $amount],
+                ], AccountingService::nextEntryNumber('RV'), null, 'receipt_voucher');
 
-            // تحديث رصيد الخزينة
-            $register = CashRegister::findOrFail($request->cash_register_id);
-            $register->increment('current_balance', $request->amount);
+                CashRegister::whereKey($request->cash_register_id)->lockForUpdate()->firstOrFail()
+                    ->increment('current_balance', $amount);
 
-            // إذا كان مرتبط بعميل، نخفض مديونية العميل
-            if ($request->customer_id) {
-                $latestAccount = CustomerAccount::where('customer_id', $request->customer_id)->latest()->first();
-                $lastBalance = $latestAccount ? $latestAccount->balance : 0;
-                $newBalance = $lastBalance - $request->amount;
-
-                CustomerAccount::create([
-                    'customer_id' => $request->customer_id,
-                    'transaction_type' => 'receipt_voucher',
-                    'debit' => 0,
-                    'credit' => $request->amount,
-                    'balance' => $newBalance,
-                ]);
-            }
-
-            DB::commit();
-            return back()->with('success', 'تم إنشاء سند القبض وتسجيل القيود بنجاح.');
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return back()->with('error', 'حدث خطأ أثناء حفظ سند القبض: ' . $e->getMessage());
+                if ($request->customer_id) {
+                    CustomerLedger::recordPayment(
+                        (int) $request->customer_id,
+                        $amount,
+                        'سند قبض: ' . $request->description,
+                        'receipt_voucher'
+                    );
+                }
+            });
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage())->withInput();
+        } catch (\Throwable $e) {
+            report($e);
+            return back()->with('error', 'حدث خطأ أثناء حفظ سند القبض، يرجى المحاولة مرة أخرى.')->withInput();
         }
+
+        return back()->with('success', 'تم إنشاء سند القبض وتسجيل القيد بنجاح.');
     }
 
     /**
-     * 2. سند صرف (Payment Voucher) - دفع نقدية لمورد أو مصروف
+     * 2. سند صرف (Payment Voucher) - صرف نقدية لمورد أو مصروف آخر
+     * القيد: من حـ/ ذمم الموردين (أو مصروفات أخرى)  إلى حـ/ الصندوق
      */
     public function storePaymentVoucher(Request $request)
     {
         $request->validate([
-            'organization_id' => 'required|exists:organizations,id',
-            'cash_register_id' => 'required|exists:cash_registers,id',
-            'supplier_id' => 'nullable|exists:suppliers,id',
-            'amount' => 'required|numeric|min:0.01',
-            'description' => 'required|string',
+            'organization_id'  => 'required|exists:organizations,id,deleted_at,NULL',
+            'cash_register_id' => 'required|exists:cash_registers,id,deleted_at,NULL',
+            'supplier_id'      => 'nullable|exists:suppliers,id,deleted_at,NULL',
+            'amount'           => 'required|numeric|min:0.01',
+            'description'      => 'required|string',
         ]);
 
         try {
-            DB::beginTransaction();
+            DB::transaction(function () use ($request) {
+                $orgId = \App\Support\Tenancy::orgId() ?? (int) $request->organization_id;
+                $amount = (float) $request->amount;
 
-            // 1. إنشاء قيد يومي تلقائي
-            $entry = JournalEntry::create([
-                'organization_id' => $request->organization_id,
-                'entry_number' => 'PV-' . date('Ymd') . '-' . rand(1000, 9999),
-                'entry_date' => now(),
-                'description' => 'سند صرف: ' . $request->description,
-                'ref_type' => 'payment_voucher',
-                'ref_id' => null,
-            ]);
+                $register = CashRegister::whereKey($request->cash_register_id)->lockForUpdate()->firstOrFail();
+                if ($register->current_balance < $amount) {
+                    throw new \InvalidArgumentException('رصيد الخزينة الحالي لا يكفي لإتمام عملية الصرف!');
+                }
 
-            // تحديث رصيد الخزينة (خصم المبلغ)
-            $register = CashRegister::findOrFail($request->cash_register_id);
-            if ($register->current_balance < $request->amount) {
-                return back()->with('error', 'رصيد الخزينة الحالي لا يكفي لإتمام عملية الصرف!');
-            }
-            $register->decrement('current_balance', $request->amount);
+                $cash = AccountingService::systemAccount(AccountingService::CASH, $orgId);
+                $debitAccount = $request->supplier_id
+                    ? AccountingService::systemAccount(AccountingService::PAYABLES, $orgId)
+                    : AccountingService::systemAccount(AccountingService::OTHER_EXPENSES, $orgId);
 
-            // إذا كان مرتبط بمورد، نخفض المستحق للمورد
-            if ($request->supplier_id) {
-                $latestAccount = SupplierAccount::where('supplier_id', $request->supplier_id)->latest()->first();
-                $lastBalance = $latestAccount ? $latestAccount->balance : 0;
-                $newBalance = $lastBalance - $request->amount;
+                AccountingService::post($orgId, 'سند صرف: ' . $request->description, [
+                    ['account_id' => $debitAccount->id, 'debit' => $amount, 'credit' => 0],
+                    ['account_id' => $cash->id, 'debit' => 0, 'credit' => $amount],
+                ], AccountingService::nextEntryNumber('PV'), null, 'payment_voucher');
 
-                SupplierAccount::create([
-                    'supplier_id' => $request->supplier_id,
-                    'transaction_type' => 'payment_voucher',
-                    'debit' => $request->amount,
-                    'credit' => 0,
-                    'balance' => $newBalance,
-                ]);
-            }
+                $register->decrement('current_balance', $amount);
 
-            DB::commit();
-            return back()->with('success', 'تم إنشاء سند الصرف بنجاح وتحديث الخزينة.');
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return back()->with('error', 'حدث خطأ: ' . $e->getMessage());
+                if ($request->supplier_id) {
+                    $supplier = Supplier::whereKey($request->supplier_id)->lockForUpdate()->firstOrFail();
+                    $supplier->balance = round((float) $supplier->balance - $amount, 2);
+                    $supplier->save();
+
+                    SupplierAccount::create([
+                        'supplier_id'      => $supplier->id,
+                        'transaction_type' => 'payment_voucher',
+                        'debit'            => $amount,
+                        'credit'           => 0,
+                        'balance'          => $supplier->balance,
+                    ]);
+                }
+            });
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage())->withInput();
+        } catch (\Throwable $e) {
+            report($e);
+            return back()->with('error', 'حدث خطأ أثناء حفظ سند الصرف، يرجى المحاولة مرة أخرى.')->withInput();
         }
+
+        return back()->with('success', 'تم إنشاء سند الصرف بنجاح وتحديث الخزينة.');
     }
 
     /**
-     * 3. تقرير قائمة الدخل (Income Statement / Profit & Loss)
+     * 3. قائمة الدخل (Income Statement)
      */
-    public function incomeStatement()
+    public function incomeStatement(Request $request)
     {
-        // حساب إجمالي الإيرادات والمصروفات من قيود اليومية أو جدول الحسابات
-        // استخراج الحسابات التي نوعها إيرادات ومصروفات
-        $revenues = Account::where('account_type', 'revenue')->with('journalEntryLines')->get();
-        $expenses = Account::where('account_type', 'expense')->with('journalEntryLines')->get();
+        [$from, $to] = $this->period($request);
 
-        $totalRevenue = 0;
-        foreach ($revenues as $rev) {
-            $totalRevenue += $rev->journalEntryLines->sum('credit') - $rev->journalEntryLines->sum('debit');
-        }
+        $revenues = $this->accountsWithTotals('revenue', $from, $to);
+        $expenses = $this->accountsWithTotals('expense', $from, $to);
 
-        $totalExpense = 0;
-        foreach ($expenses as $exp) {
-            $totalExpense += $exp->journalEntryLines->sum('debit') - $exp->journalEntryLines->sum('credit');
-        }
-
+        $totalRevenue = $revenues->sum(fn ($acc) => $acc->total_credit - $acc->total_debit);
+        $totalExpense = $expenses->sum(fn ($acc) => $acc->total_debit - $acc->total_credit);
         $netProfit = $totalRevenue - $totalExpense;
 
-        return view('accounting.reports.income_statement', compact('revenues', 'expenses', 'totalRevenue', 'totalExpense', 'netProfit'));
+        return view('accounting.reports.income_statement', compact('revenues', 'expenses', 'totalRevenue', 'totalExpense', 'netProfit', 'from', 'to'));
     }
 
     /**
-     * 4. تقرير المركز المالي (Balance Sheet)
+     * 4. الميزانية العمومية (Balance Sheet)
      */
-    public function balanceSheet()
+    public function balanceSheet(Request $request)
     {
-        $assets = Account::where('account_type', 'asset')->with('journalEntryLines')->get();
-        $liabilities = Account::where('account_type', 'liability')->with('journalEntryLines')->get();
-        $equity = Account::where('account_type', 'equity')->with('journalEntryLines')->get();
+        [, $to] = $this->period($request);
 
-        $totalAssets = $assets->sum(fn($acc) => $acc->journalEntryLines->sum('debit') - $acc->journalEntryLines->sum('credit'));
-        $totalLiabilities = $liabilities->sum(fn($acc) => $acc->journalEntryLines->sum('credit') - $acc->journalEntryLines->sum('debit'));
-        $totalEquity = $equity->sum(fn($acc) => $acc->journalEntryLines->sum('credit') - $acc->journalEntryLines->sum('debit'));
+        $assets = $this->accountsWithTotals('asset', null, $to);
+        $liabilities = $this->accountsWithTotals('liability', null, $to);
+        $equity = $this->accountsWithTotals('equity', null, $to);
 
-        return view('accounting.reports.balance_sheet', compact('assets', 'liabilities', 'equity', 'totalAssets', 'totalLiabilities', 'totalEquity'));
+        $totalAssets = $assets->sum(fn ($acc) => $acc->total_debit - $acc->total_credit);
+        $totalLiabilities = $liabilities->sum(fn ($acc) => $acc->total_credit - $acc->total_debit);
+        $totalEquity = $equity->sum(fn ($acc) => $acc->total_credit - $acc->total_debit);
+
+        // صافي الربح غير المرحّل يظهر ضمن حقوق الملكية حتى تتوازن الميزانية
+        $revenue = $this->accountsWithTotals('revenue', null, $to)->sum(fn ($a) => $a->total_credit - $a->total_debit);
+        $expense = $this->accountsWithTotals('expense', null, $to)->sum(fn ($a) => $a->total_debit - $a->total_credit);
+        $retainedEarnings = $revenue - $expense;
+
+        return view('accounting.reports.balance_sheet', compact(
+            'assets', 'liabilities', 'equity', 'totalAssets', 'totalLiabilities', 'totalEquity', 'retainedEarnings', 'to'
+        ));
+    }
+
+    private function period(Request $request): array
+    {
+        $request->validate([
+            'from' => 'nullable|date',
+            'to'   => 'nullable|date|after_or_equal:from',
+        ]);
+
+        return [$request->input('from'), $request->input('to')];
+    }
+
+    /**
+     * جلب الحسابات مع مجموع المدين والدائن من قاعدة البيانات مباشرة (بدون تحميل كل السطور)
+     */
+    private function accountsWithTotals(string $type, ?string $from, ?string $to)
+    {
+        $filter = function ($q) use ($from, $to) {
+            $q->whereHas('journalEntry', function ($e) use ($from, $to) {
+                if ($from) {
+                    $e->whereDate('entry_date', '>=', $from);
+                }
+                if ($to) {
+                    $e->whereDate('entry_date', '<=', $to);
+                }
+            });
+        };
+
+        return Account::where('account_type', $type)
+            ->withSum(['journalEntryLines as total_debit' => $filter], 'debit')
+            ->withSum(['journalEntryLines as total_credit' => $filter], 'credit')
+            ->orderBy('account_code')
+            ->get()
+            ->each(function ($acc) {
+                $acc->total_debit = (float) $acc->total_debit;
+                $acc->total_credit = (float) $acc->total_credit;
+            });
     }
 }

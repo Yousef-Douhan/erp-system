@@ -10,7 +10,7 @@ class EmployeeController extends Controller
 {
     public function index()
     {
-        $employees = Employee::with('organization')->latest()->get();
+        $employees = Employee::with('organization')->latest()->paginate(25);
         $organizations = Organization::all(); // لجلب المنظمات في قوائم الاختيار (Select)
         return view('employees.index', compact('employees', 'organizations'));
     }
@@ -18,7 +18,7 @@ class EmployeeController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'organization_id' => 'required|exists:organizations,id',
+            'organization_id' => 'required|exists:organizations,id,deleted_at,NULL',
             'first_name'      => 'required|string|max:255',
             'last_name'       => 'required|string|max:255',
             'salary'          => 'required|numeric|min:0',
@@ -35,7 +35,7 @@ class EmployeeController extends Controller
     public function update(Request $request, Employee $employee)
     {
         $validated = $request->validate([
-            'organization_id' => 'required|exists:organizations,id',
+            'organization_id' => 'required|exists:organizations,id,deleted_at,NULL',
             'first_name'      => 'required|string|max:255',
             'last_name'       => 'required|string|max:255',
             'salary'          => 'required|numeric|min:0',

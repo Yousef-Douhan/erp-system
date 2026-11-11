@@ -28,6 +28,8 @@
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">كلمة المرور</label>
                     <input type="password" name="password" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <input type="password" name="password_confirmation" required placeholder="أعد كتابة كلمة المرور" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none mt-2" dir="ltr" autocomplete="new-password">
+                    <p class="text-[11px] text-slate-500 mt-1">8 أحرف على الأقل، وتحتوي حروفاً وأرقاماً.</p>
                 </div>
             </div>
 

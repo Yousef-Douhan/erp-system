@@ -8,10 +8,12 @@
             <h2 class="text-xl font-extrabold text-slate-800">إدارة المبيعات (Sales)</h2>
             <p class="text-xs text-slate-400 mt-1">متابعة فواتير المبيعات، المبالغ المدفوعة، وحالة الدفع</p>
         </div>
+        @can('create', \App\Models\Sale::class)
         <button onclick="openModal('addModal')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-md transition-all flex items-center gap-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             إضافة فاتورة جديدة
         </button>
+        @endcan
     </div>
 
     <!-- Alert Success -->
@@ -121,14 +123,18 @@
                             <a href="{{ route('sales.show', $sale->id) }}" class="text-emerald-600 hover:text-emerald-800 text-xs font-semibold px-2.5 py-1 bg-emerald-50 rounded-lg">عرض</a>
 
                             <!-- زر التعديل -->
+                            @can('update', $sale)
                             <button onclick='openEditModal(@json($sale))' class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold px-2.5 py-1 bg-indigo-50 rounded-lg">تعديل</button>
+                            @endcan
 
                             <!-- زر الحذف -->
+                            @can('delete', $sale)
                             <form action="{{ route('sales.destroy', $sale->id) }}" method="POST" onsubmit="return confirm('هل أنت متأكد من حذف الفاتورة؟');">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="text-rose-600 hover:text-rose-800 text-xs font-semibold px-2.5 py-1 bg-rose-50 rounded-lg">حذف</button>
                             </form>
+                            @endcan
                         </td>
                     </tr>
                 @empty
@@ -140,6 +146,7 @@
                 @endforelse
             </tbody>
         </table>
+        <div class="p-4">{{ $sales->links() }}</div>
     </div>
 </div>
 
@@ -208,7 +215,7 @@
                 <select name="employee_id" class="w-full rounded-xl border-slate-200 text-sm" required>
                     <option value="">اختر الموظف</option>
                     @foreach($employees as $emp)
-                        <option value="{{ $emp->id }}">{{ $emp->name }}</option>
+                        <option value="{{ $emp->id }}">{{ $emp->username }}</option>
                     @endforeach
                 </select>
             </div>
@@ -312,7 +319,7 @@
                 <select name="employee_id" id="edit_employee_id" class="w-full rounded-xl border-slate-200 text-sm" required>
                     <option value="">اختر الموظف</option>
                     @foreach($employees as $emp)
-                        <option value="{{ $emp->id }}">{{ $emp->name }}</option>
+                        <option value="{{ $emp->id }}">{{ $emp->username }}</option>
                     @endforeach
                 </select>
             </div>
@@ -373,8 +380,8 @@
         document.getElementById('edit_paid_amount').value = sale.paid_amount;
         document.getElementById('edit_status').value = sale.status;
 
-        document.getElementById('editForm').action = `/sales/${sale.id}`;
+        document.getElementById('editForm').action = `{{ url('sales') }}/${sale.id}`;
         openModal('editModal');
     }
 </script>
-@endsection
+@endsection

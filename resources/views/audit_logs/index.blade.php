@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
+@include('partials.flash', ['withSuccess' => false])
     <div class="max-w-7xl mx-auto space-y-6">
 
         @if (session('success'))
@@ -35,7 +36,7 @@
                     <tbody class="divide-y divide-slate-100">
                         @forelse($logs as $log)
                             <tr class="hover:bg-slate-50/50">
-                                <td class="p-4 font-bold text-slate-800">{{ $log->user->name ?? 'مستخدم مجهول / نظام' }}
+                                <td class="p-4 font-bold text-slate-800">{{ $log->user->username ?? 'مستخدم مجهول / نظام' }}
                                 </td>
 
                                 <td class="p-4">
@@ -61,7 +62,7 @@
                                 <td class="p-4 text-center space-x-2 space-x-reverse">
                                     <!-- زر عرض التفاصيل بشكل أنيق ككروت -->
                                     <button type="button"
-                                        onclick="showDetails('{{ $log->user->name ?? 'غير معروف' }}', '{{ $log->action }}', '{{ $log->table_name }}', '{{ $log->ip_address }}', `{{ is_array($log->old_values) ? json_encode($log->old_values, JSON_UNESCAPED_UNICODE) : $log->old_values }}`, `{{ is_array($log->new_values) ? json_encode($log->new_values, JSON_UNESCAPED_UNICODE) : $log->new_values }}`)"
+                                        onclick="showDetails('{{ $log->user->username ?? 'غير معروف' }}', '{{ $log->action }}', '{{ $log->table_name }}', '{{ $log->ip_address }}', `{{ is_array($log->old_values) ? json_encode($log->old_values, JSON_UNESCAPED_UNICODE) : $log->old_values }}`, `{{ is_array($log->new_values) ? json_encode($log->new_values, JSON_UNESCAPED_UNICODE) : $log->new_values }}`)"
                                         class="text-indigo-600 hover:underline font-bold">التفاصيل</button>
 
                                     <form action="{{ route('audit-logs.destroy', $log->id) }}" method="POST"

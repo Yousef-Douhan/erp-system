@@ -11,7 +11,7 @@ class EmployeeBranchController extends Controller
 {
     public function index()
     {
-        $employeeBranches = EmployeeBranch::with(['employee', 'branch'])->latest()->get();
+        $employeeBranches = EmployeeBranch::with(['employee', 'branch'])->latest()->paginate(25);
         $employees = Employee::all();
         $branches = Branch::all();
 
@@ -21,8 +21,8 @@ class EmployeeBranchController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'employee_id' => 'required|exists:employees,id',
-            'branch_id'   => 'required|exists:branches,id',
+            'employee_id' => 'required|exists:employees,id,deleted_at,NULL',
+            'branch_id'   => 'required|exists:branches,id,deleted_at,NULL',
             'is_primary'  => 'nullable|boolean',
         ]);
 
@@ -41,8 +41,8 @@ class EmployeeBranchController extends Controller
     public function update(Request $request, EmployeeBranch $employeeBranch)
     {
         $validated = $request->validate([
-            'employee_id' => 'required|exists:employees,id',
-            'branch_id'   => 'required|exists:branches,id',
+            'employee_id' => 'required|exists:employees,id,deleted_at,NULL',
+            'branch_id'   => 'required|exists:branches,id,deleted_at,NULL',
             'is_primary'  => 'nullable|boolean',
         ]);
 

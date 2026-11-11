@@ -41,7 +41,18 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        // الحساب الموقوف: رسالة واضحة بدل "بيانات الدخول غير صحيحة"
+        $user = \App\Models\User::where('email', $this->input('email'))->first();
+        if ($user && ! $user->is_active && \Illuminate\Support\Facades\Hash::check((string) $this->input('password'), $user->password)) {
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'email' => 'هذا الحساب موقوف. تواصل مع مدير النظام لإعادة تفعيله.',
+            ]);
+        }
+
+        // منع المستخدمين الموقوفين (is_active = false) من تسجيل الدخول
+        if (! Auth::attempt($this->only('email', 'password') + ['is_active' => true], $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([

@@ -18,7 +18,7 @@ class CategoryController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'parent_id' => 'nullable|exists:categories,id',
+            'parent_id' => 'nullable|exists:categories,id,deleted_at,NULL',
             'is_active' => 'required|in:0,1'
         ]);
 
@@ -26,7 +26,7 @@ class CategoryController extends Controller
             'name' => $validated['name'],
             'parent_id' => $validated['parent_id'] ?? null,
             'is_active' => $validated['is_active'],
-            'organization_id' => 1
+            'organization_id' => $this->currentOrganizationId()
         ]);
 
         return response()->json(['success' => true, 'message' => 'تم إضافة الفئة بنجاح', 'category' => $category]);
@@ -36,7 +36,7 @@ class CategoryController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'parent_id' => 'nullable|exists:categories,id',
+            'parent_id' => 'nullable|exists:categories,id,deleted_at,NULL',
             'is_active' => 'required|in:0,1'
         ]);
 

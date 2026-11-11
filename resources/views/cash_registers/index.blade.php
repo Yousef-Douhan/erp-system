@@ -109,7 +109,7 @@
 <script>
     function editItem(id, branchId, name, openingBalance, status) {
         const form = document.getElementById('crud-form');
-        form.action = `/cash-registers/${id}`;
+        form.action = `{{ url('cash-registers') }}/${id}`;
         document.getElementById('form-method').value = 'PUT';
         document.getElementById('branch_id').value = branchId;
         document.getElementById('name').value = name;
@@ -137,4 +137,4 @@
         document.getElementById('cancel-btn').classList.add('hidden');
     }
 </script>
-@endsection
+@endsection

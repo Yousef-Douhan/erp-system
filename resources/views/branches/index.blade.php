@@ -3,11 +3,12 @@
 @section('header')
     <div>
         <h2 class="text-xl font-extrabold text-slate-800 tracking-tight">إدارة الفروع</h2>
-        <p class="text-xs text-slate-400 mt-0.5">إدارة فروع المنظمات والصيدليات والمستودعات التابعة للنظام.</p>
+        <p class="text-xs text-slate-400 mt-0.5">إدارة فروع الصيدليات والصيدليات والمستودعات التابعة للنظام.</p>
     </div>
 @endsection
 
 @section('content')
+@include('partials.flash', ['withSuccess' => false])
     <div class="space-y-6">
         <!-- رسالة النجاح -->
         @if(session('success'))
@@ -25,12 +26,12 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                     </svg>
                 </span>
-                <input type="text" id="branchSearch" onkeyup="searchBranches()" class="w-full pr-10 pl-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all" placeholder="بحث عن فرع، منظمة، أو عنوان...">
+                <input type="text" id="branchSearch" onkeyup="searchBranches()" class="w-full pr-10 pl-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all" placeholder="بحث عن فرع، صيدلية، أو عنوان...">
             </div>
             
             <div class="flex items-center justify-between w-full sm:w-auto gap-4">
                 <div class="text-xs text-slate-400 font-medium">
-                    إجمالي الفروع: <span class="font-bold text-slate-700">{{ $branches->count() }}</span>
+                    إجمالي الفروع: <span class="font-bold text-slate-700">{{ $branches->total() }}</span>
                 </div>
                 
                 <button onclick="openCreateModal()" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm shadow-indigo-200 transition-all">
@@ -49,7 +50,7 @@
                     <thead>
                         <tr class="bg-slate-50/75 border-b border-slate-100 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
                             <th class="py-3.5 px-6">اسم الفرع</th>
-                            <th class="py-3.5 px-6">المنظمة التابع لها</th>
+                            <th class="py-3.5 px-6">الصيدلية التابع لها</th>
                             <th class="py-3.5 px-6">النوع / التصنيف</th>
                             <th class="py-3.5 px-6">الهاتف</th>
                             <th class="py-3.5 px-6">العنوان</th>
@@ -106,6 +107,7 @@
                         @endforelse
                     </tbody>
                 </table>
+<div class="p-4">{{ $branches->links() }}</div>
             </div>
         </div>
     </div>
@@ -125,9 +127,9 @@
                 <div id="methodField"></div>
 
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">المنظمة التابع لها</label>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">الصيدلية التابع لها</label>
                     <select name="organization_id" id="organization_id" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                        <option value="">اختر المنظمة...</option>
+                        <option value="">اختر الصيدلية...</option>
                         @foreach($organizations as $org)
                             <option value="{{ $org->id }}">{{ $org->name }}</option>
                         @endforeach
@@ -187,7 +189,7 @@
 
         function openEditModal(branch) {
             modalTitle.innerText = 'تعديل بيانات الفرع';
-            form.action = `/branches/${branch.id}`;
+            form.action = `{{ url('branches') }}/${branch.id}`;
             methodField.innerHTML = '@method("PUT")';
             
             document.getElementById('organization_id').value = branch.organization_id;
@@ -223,4 +225,4 @@
             }
         }
     </script>
-@endsection
+@endsection

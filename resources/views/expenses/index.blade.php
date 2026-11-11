@@ -114,7 +114,7 @@
 <script>
     function editItem(id, branchId, amount, date, regId, desc) {
         const form = document.getElementById('crud-form');
-        form.action = `/expenses/${id}`;
+        form.action = `{{ url('expenses') }}/${id}`;
         document.getElementById('form-method').value = 'PUT';
         document.getElementById('branch_id').value = branchId;
         document.getElementById('amount').value = amount;
@@ -143,4 +143,4 @@
         document.getElementById('cancel-btn').classList.add('hidden');
     }
 </script>
-@endsection
+@endsection

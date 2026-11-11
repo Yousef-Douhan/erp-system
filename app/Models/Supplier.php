@@ -2,13 +2,17 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Traits\BelongsToTenant;
 use App\Traits\AuditLogsable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Supplier extends Model
 {
-    use HasFactory, AuditLogsable;
+    use HasFactory, AuditLogsable, BelongsToTenant, SoftDeletes;
+
+    protected static ?string $tenantOrg = 'organization_id';
 
     protected $fillable = [
         'organization_id',
@@ -20,6 +24,6 @@ class Supplier extends Model
 
     public function organization()
     {
-        return $this->belongsTo(Organization::class);
+        return $this->belongsTo(Organization::class)->withTrashed();
     }
 }

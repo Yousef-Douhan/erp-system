@@ -23,7 +23,7 @@ class BrandController extends Controller
         $brand = Brand::create([
             'name' => $validated['name'],
             'is_active' => $validated['is_active'],
-            'organization_id' => 1 // أو auth()->user()->organization_id حسب نظامك
+            'organization_id' => $this->currentOrganizationId(),
         ]);
 
         return response()->json([

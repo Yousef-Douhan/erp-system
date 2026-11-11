@@ -55,7 +55,7 @@
                     <!-- الكمية -->
                     <div>
                         <label class="block text-sm font-bold text-slate-700 mb-2">الكمية الحالية</label>
-                        <input type="number" name="quantity" value="{{ old('quantity', $item->quantity) }}" min="0" required 
+                        <input type="number" name="quantity" value="{{ old('quantity', $item->stock_quantity) }}" min="0" required 
                             class="w-full px-5 py-3 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 text-sm outline-none transition-all">
                         @error('quantity')
                             <span class="text-xs text-rose-600 mt-1 block">{{ $message }}</span>
@@ -67,7 +67,7 @@
                         <label class="block text-sm font-bold text-slate-700 mb-2">سعر البيع</label>
                         <div class="relative">
                             <span class="absolute left-4 top-3.5 text-slate-400 font-medium text-sm">شيكل</span>
-                            <input type="number" step="0.01" name="price" value="{{ old('price', $item->price) }}" min="0" required 
+                            <input type="number" step="0.01" name="price" value="{{ old('price', $item->selling_price) }}" min="0" required 
                                 class="w-full px-5 py-3 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 text-sm outline-none transition-all">
                         </div>
                         @error('price')
@@ -89,4 +89,4 @@
             </form>
         </div>
     </div>
-</x-app-layout>
+</x-app-layout>

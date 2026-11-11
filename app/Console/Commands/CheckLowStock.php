@@ -20,7 +20,8 @@ class CheckLowStock extends Command
             ->get();
 
         foreach ($products as $product) {
-            $admins = User::where('is_active', true)->get();
+            // مستخدمو نفس الصيدلية فقط
+            $admins = User::where('is_active', true)->where('organization_id', $product->organization_id)->get();
 
             foreach ($admins as $admin) {
                 // كائن وهمي لتمرير الرصيد الحالي لكلاس الإشعار

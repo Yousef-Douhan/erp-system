@@ -39,6 +39,34 @@ class RolesAndPermissionsSeeder extends Seeder
             // إدارة الصلاحيات والمستخدمين
             'manage_roles',
             'manage_users',
+
+            // المبيعات ونقطة البيع
+            'manage_sales',
+            'edit_sales',
+            'delete_sales',
+
+            // المشتريات (تعديل وحذف)
+            'edit_purchases',
+            'delete_purchases',
+
+            // المحاسبة والخزائن والتقارير
+            'manage_accounting',
+
+            // إعدادات المنشأة (المنظمات، الفروع، الموظفين، طرق الدفع)
+            'manage_settings',
+
+            // سجل التدقيق
+            'view_audit_logs',
+
+            // المرتجعات والورديات والجرد ودفعات الموردين والتقارير
+            'return_sales',
+            'manage_shifts',
+            'stock_count',
+            'transfer_stock',
+            'print_barcodes',
+            'pay_suppliers',
+            'view_reports',
+            'manage_backups',
         ];
 
         foreach ($permissions as $permission) {
@@ -60,6 +88,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view_pharmacy',
             'create_products',
             'edit_products',
+            'manage_sales',
         ]);
 
         // دور المحاسب (Accountant)
@@ -69,6 +98,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view_purchases',
             'create_purchases',
             'view_customers',
+            'manage_accounting',
         ]);
 
         // 4. إنشاء مستخدم تجريبي وإعطاؤه دور "Admin"
@@ -82,8 +112,6 @@ class RolesAndPermissionsSeeder extends Seeder
                 'is_active'       => true,
             ]
         );
-
-        $adminUser->assignRole($adminRole);
 
         $adminUser->assignRole($adminRole);
     }

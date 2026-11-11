@@ -20,7 +20,7 @@ class ProductBarcodeController extends Controller
     public function store(Request $request, Product $product, ProductUnit $unit)
     {
         $validated = $request->validate([
-            'barcode' => 'required|string|max:100|unique:product_barcodes,barcode',
+            'barcode' => ['required', 'string', 'max:100', \Illuminate\Validation\Rule::unique('product_barcodes', 'barcode')->where(fn ($q) => $q->whereIn('product_unit_id', \App\Models\ProductUnit::query()->select('id')))],
             'type' => 'nullable|string|max:50',
         ]);
 
@@ -37,7 +37,7 @@ class ProductBarcodeController extends Controller
     public function update(Request $request, Product $product, ProductUnit $unit, ProductBarcode $barcode)
     {
         $validated = $request->validate([
-            'barcode' => 'required|string|max:100|unique:product_barcodes,barcode,' . $barcode->id,
+            'barcode' => ['required', 'string', 'max:100', \Illuminate\Validation\Rule::unique('product_barcodes', 'barcode')->where(fn ($q) => $q->whereIn('product_unit_id', \App\Models\ProductUnit::query()->select('id')))->ignore($barcode->id)],
             'type' => 'nullable|string|max:50',
         ]);
 

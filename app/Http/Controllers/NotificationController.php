@@ -28,6 +28,7 @@ class NotificationController extends Controller
 
         if ($notification) {
             $notification->update(['is_read' => 1]);
+            \Illuminate\Support\Facades\Cache::forget('layout.unread.' . $user->id);
         }
 
         return response()->json(['success' => true]);
@@ -40,6 +41,7 @@ class NotificationController extends Controller
 
         // تحديث جميع إشعارات المستخدم غير المقروءة لتصبح مقروءة (is_read = 1)
         $user->notifications()->where('is_read', 0)->update(['is_read' => 1]);
+        \Illuminate\Support\Facades\Cache::forget('layout.unread.' . $user->id);
 
         return back()->with('success', 'تم تحديد كل الإشعارات كمقروءة.');
     }

@@ -11,14 +11,14 @@ class DrugAlertController extends Controller
     public function index()
     {
         $alerts = DrugAlert::with('product')->latest()->paginate(15);
-        $products = Product::all(); // جلب قائمة الأدوية/المنتجات للقائمة المنسدلة
+        $products = Product::where('is_active', true)->orderBy('name')->get(); // جلب قائمة الأدوية/المنتجات للقائمة المنسدلة
         return view('drug_alerts.index', compact('alerts', 'products'));
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'product_id' => 'required|exists:products,id',
+            'product_id' => 'required|exists:products,id,deleted_at,NULL',
             'severity'   => 'required|string|in:low,medium,high,critical',
             'message'    => 'required|string',
         ]);
@@ -31,7 +31,7 @@ class DrugAlertController extends Controller
     public function update(Request $request, DrugAlert $drugAlert)
     {
         $validated = $request->validate([
-            'product_id' => 'required|exists:products,id',
+            'product_id' => 'required|exists:products,id,deleted_at,NULL',
             'severity'   => 'required|string|in:low,medium,high,critical',
             'message'    => 'required|string',
         ]);

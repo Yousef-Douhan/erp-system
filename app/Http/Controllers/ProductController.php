@@ -7,24 +7,25 @@ use App\Models\Category;
 use App\Models\Brand;
 use App\Models\Unit;
 use App\Models\Notification; // تأكد من استدعاء موديل الإشعارات
+use App\Support\ArabicSearch;
 use Illuminate\Http\Request;
 
 class ProductController extends Controller
 {
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Product::class);
+
         $search = $request->input('search');
 
-        $products = Product::with(['category', 'brand', 'unit'])
-            ->when($search, function ($query, $search) {
-                return $query->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                        ->orWhere('barcode', 'like', "%{$search}%")
-                        ->orWhere('sku', 'like', "%{$search}%");
-                });
-            })
+        $products = Product::visibleTo($request->user())->with(['category', 'brand', 'unit'])
+            // بحث غير حساس للهمزات والتاء المربوطة والتشكيل، وبأي ترتيب للكلمات
+            ->when($search, fn ($query, $search) => ArabicSearch::apply($query, $search, ['name', 'barcode', 'sku']))
             ->latest()
             ->paginate(10);
+
+        // مستخدم الفرع يرى رصيد فرعه، وصاحب الصيدلية يرى الإجمالي
+        \App\Support\Stock::overlay($products);
 
         $categories = Category::all();
         $brands = Brand::all();
@@ -35,14 +36,16 @@ class ProductController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorize('create', Product::class);
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'sku' => 'nullable|string|max:100',
-            'barcode' => 'nullable|string|max:100|unique:products,barcode',
-            'category_id' => 'nullable|exists:categories,id',
-            'brand_id' => 'nullable|exists:brands,id',
-            'unit_id' => 'nullable|exists:units,id',
-            'purchase_price' => 'required|numeric|min:0',
+            'barcode' => ['nullable', 'string', 'max:100', \Illuminate\Validation\Rule::unique('products', 'barcode')->where('organization_id', $this->currentOrganizationId())],
+            'category_id' => 'nullable|exists:categories,id,deleted_at,NULL',
+            'brand_id' => 'nullable|exists:brands,id,deleted_at,NULL',
+            'unit_id' => 'nullable|exists:units,id,deleted_at,NULL',
+            'purchase_price' => 'required|numeric|min:0|lte:selling_price',
             'selling_price' => 'required|numeric|min:0',
             'stock_quantity' => 'required|integer|min:0',
             'alert_quantity' => 'required|integer|min:0',
@@ -51,10 +54,12 @@ class ProductController extends Controller
             'track_expiry' => 'sometimes|boolean',
             'is_controlled' => 'sometimes|boolean',
             'is_active' => 'sometimes|boolean',
+        ], [
+            'purchase_price.lte' => 'سعر الشراء أعلى من سعر البيع. الأسعار هنا للحبة (الوحدة الأساسية): أدخل سعر الحبة الواحدة وليس العلبة.',
         ]);
 
         $product = Product::create([
-            'organization_id' => 1,
+            'organization_id' => $this->currentOrganizationId(),
             'category_id' => $validated['category_id'] ?? null,
             'brand_id' => $validated['brand_id'] ?? null,
             'unit_id' => $validated['unit_id'] ?? null,
@@ -63,7 +68,7 @@ class ProductController extends Controller
             'barcode' => $validated['barcode'] ?? null,
             'purchase_price' => $validated['purchase_price'],
             'selling_price' => $validated['selling_price'],
-            'stock_quantity' => $validated['stock_quantity'],
+            'stock_quantity' => 0,
             'alert_quantity' => $validated['alert_quantity'],
             'expiry_date' => $validated['expiry_date'] ?? null,
             'description' => $validated['description'] ?? null,
@@ -71,6 +76,10 @@ class ProductController extends Controller
             'is_controlled' => $request->has('is_controlled'),
             'is_active' => $request->has('is_active'),
         ]);
+
+        // الرصيد الافتتاحي يدخل مستودع فرع المستخدم كحركة مخزنية
+        \App\Support\Stock::move($product->id, null, (int) $validated['stock_quantity'], 'opening_stock', 'product', $product->id);
+        $product->refresh();
 
         // فحص المخزون عند الإضافة
         $this->checkStockAlert($product);
@@ -80,14 +89,16 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product)
     {
+        $this->authorize('update', $product);
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'sku' => 'nullable|string|max:100',
-            'barcode' => 'nullable|string|max:100|unique:products,barcode,' . $product->id,
-            'category_id' => 'nullable|exists:categories,id',
-            'brand_id' => 'nullable|exists:brands,id',
-            'unit_id' => 'nullable|exists:units,id',
-            'purchase_price' => 'required|numeric|min:0',
+            'barcode' => ['nullable', 'string', 'max:100', \Illuminate\Validation\Rule::unique('products', 'barcode')->where('organization_id', $product->organization_id)->ignore($product->id)],
+            'category_id' => 'nullable|exists:categories,id,deleted_at,NULL',
+            'brand_id' => 'nullable|exists:brands,id,deleted_at,NULL',
+            'unit_id' => 'nullable|exists:units,id,deleted_at,NULL',
+            'purchase_price' => 'required|numeric|min:0|lte:selling_price',
             'selling_price' => 'required|numeric|min:0',
             'stock_quantity' => 'required|integer|min:0',
             'alert_quantity' => 'required|integer|min:0',
@@ -96,6 +107,8 @@ class ProductController extends Controller
             'track_expiry' => 'sometimes|boolean',
             'is_controlled' => 'sometimes|boolean',
             'is_active' => 'sometimes|boolean',
+        ], [
+            'purchase_price.lte' => 'سعر الشراء أعلى من سعر البيع. الأسعار هنا للحبة (الوحدة الأساسية): أدخل سعر الحبة الواحدة وليس العلبة.',
         ]);
 
         $product->update([
@@ -107,7 +120,6 @@ class ProductController extends Controller
             'barcode' => $validated['barcode'] ?? null,
             'purchase_price' => $validated['purchase_price'],
             'selling_price' => $validated['selling_price'],
-            'stock_quantity' => $validated['stock_quantity'],
             'alert_quantity' => $validated['alert_quantity'],
             'expiry_date' => $validated['expiry_date'] ?? null,
             'description' => $validated['description'] ?? null,
@@ -115,6 +127,15 @@ class ProductController extends Controller
             'is_controlled' => $request->has('is_controlled'),
             'is_active' => $request->has('is_active'),
         ]);
+
+        // تعديل الرصيد من شاشة المنتج = حركة تسوية على الفرع (رصيد الفرع لمستخدم الفرع، والإجمالي لصاحب الصيدلية)
+        $branchId = \App\Support\Stock::viewBranchId();
+        $current = $branchId ? \App\Support\Stock::quantity($product->id, $branchId) : (int) $product->stock_quantity;
+        $diff = (int) $validated['stock_quantity'] - $current;
+        if ($diff !== 0) {
+            \App\Support\Stock::move($product->id, $branchId, $diff, 'adjustment', 'product', $product->id, $product->name);
+            $product->refresh();
+        }
 
         // فحص المخزون عند التحديث
         $this->checkStockAlert($product);
@@ -124,6 +145,8 @@ class ProductController extends Controller
 
     public function destroy(Product $product)
     {
+        $this->authorize('delete', $product);
+
         $product->delete();
         return redirect()->route('products.index')->with('success', 'تم حذف المنتج بنجاح.');
     }

@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
+@include('partials.flash', ['withSuccess' => false])
 <div class="max-w-7xl mx-auto space-y-6">
     <!-- Header & Action Button -->
     <div class="flex items-center justify-between">
@@ -8,10 +9,18 @@
             <h2 class="text-xl font-extrabold text-slate-800">إدارة المنتجات (Products)</h2>
             <p class="text-xs text-slate-400 mt-1">إضافة وإدارة الأدوية والسلع مع الأسعار والمخزون</p>
         </div>
+        @can('create', \App\Models\Product::class)
+        <div class="x-actions">
+        <a href="{{ route('products.import') }}" class="x-btn is-ghost">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3m-5 5 5-5 5 5M4 21h16"/></svg>
+            استيراد من Excel
+        </a>
         <button onclick="openModal('addProductModal')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-md shadow-indigo-100 transition-all flex items-center gap-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             إضافة منتج جديد
         </button>
+        </div>
+        @endcan
     </div>
 
     <!-- شريط البحث (Search Bar) -->
@@ -89,11 +98,14 @@
                             </a>
 
                             <!-- زر التعديل -->
+                            @can('update', $product)
                             <button onclick='openEditModal(@json($product))' class="px-3 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 text-xs font-semibold rounded-lg transition-all ml-1">
                                 تعديل
                             </button>
+                            @endcan
 
                             <!-- زر الحذف -->
+                            @can('delete', $product)
                             <form action="{{ route('products.destroy', $product->id) }}" method="POST" class="inline-block" onsubmit="return confirm('هل أنت متأكد من حذف المنتج؟')">
                                 @csrf
                                 @method('DELETE')
@@ -101,6 +113,7 @@
                                     حذف
                                 </button>
                             </form>
+                            @endcan
                         </td>
                     </tr>
                 @empty
@@ -324,7 +337,7 @@
     }
 
     function openEditModal(product) {
-        document.getElementById('editProductForm').action = '/products/' + product.id;
+        document.getElementById('editProductForm').action = "{{ url('products') }}/" + product.id;
         
         document.getElementById('edit_name').value = product.name || '';
         document.getElementById('edit_sku').value = product.sku || '';
@@ -343,4 +356,4 @@
         openModal('editProductModal');
     }
 </script>
-@endsection
+@endsection

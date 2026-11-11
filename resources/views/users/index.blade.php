@@ -50,7 +50,7 @@
                         <tr class="bg-slate-50/75 text-slate-400 text-[11px] font-extrabold uppercase tracking-wider border-b border-slate-100">
                             <th class="px-6 py-4">اسم المستخدم</th>
                             <th class="px-6 py-4">البريد الإلكتروني</th>
-                            <th class="px-6 py-4">المنظمة</th>
+                            <th class="px-6 py-4">الصيدلية / الفرع</th>
                             <th class="px-6 py-4">الدور / الصلاحية</th>
                             <th class="px-6 py-4">الحالة</th>
                             <th class="px-6 py-4 text-left">الإجراءات</th>
@@ -66,7 +66,10 @@
                                     {{ $user->username ?? $user->name }}
                                 </td>
                                 <td class="px-6 py-4 font-mono text-slate-500" dir="ltr">{{ $user->email }}</td>
-                                <td class="px-6 py-4">{{ $user->organization->name ?? 'عام / رئيسي' }}</td>
+                                <td class="px-6 py-4">
+                                    {{ $user->organization->name ?? 'مدير النظام' }}
+                                    <div class="text-[11px] text-slate-500">{{ $user->branch->name ?? ($user->organization ? 'كل الفروع' : '') }}</div>
+                                </td>
                                 <td class="px-6 py-4">
                                     @foreach($user->getRoleNames() as $role)
                                         <span class="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[11px] font-bold">{{ $role }}</span>
@@ -85,13 +88,16 @@
                                 </td>
                                 <td class="px-6 py-4 text-left">
                                     <div class="flex items-center justify-end gap-1.5">
+                                        @can('update', $user)
                                         <!-- زر التعديل عبر النافذة المنبثقة -->
                                         <button type="button" 
                                             onclick="openEditModal({{ json_encode($user) }}, '{{ $user->getRoleNames()->first() }}')" 
                                             class="p-1.5 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors" title="تعديل">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                         </button>
+                                        @endcan
 
+                                        @can('delete', $user)
                                         <!-- زر الحذف -->
                                         <form action="{{ route('users.destroy', $user->id) }}" method="POST" onsubmit="return confirm('هل أنت متأكد من الحذف؟')">
                                             @csrf
@@ -100,6 +106,7 @@
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                             </button>
                                         </form>
+                                        @endcan
                                     </div>
                                 </td>
                             </tr>
@@ -110,6 +117,7 @@
                         @endforelse
                     </tbody>
                 </table>
+<div class="p-4">{{ $users->links() }}</div>
             </div>
         </div>
     </div>
@@ -141,18 +149,12 @@
                     <div>
                         <label class="block text-xs font-bold text-slate-700 mb-1">كلمة المرور</label>
                         <input type="password" name="password" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none" dir="ltr">
+                        <input type="password" name="password_confirmation" required placeholder="أعد كتابة كلمة المرور" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none mt-2" dir="ltr" autocomplete="new-password">
+                        <p class="text-[11px] text-slate-500 mt-1">8 أحرف على الأقل، وتحتوي حروفاً وأرقاماً.</p>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1">المنظمة التابع لها</label>
-                        <select name="organization_id" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                            <option value="">بدون منظمة (عام / رئيسي)</option>
-                            @foreach($organizations as $org)
-                                <option value="{{ $org->id }}">{{ $org->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
+                    @include('users._scope', ['idPrefix' => 'add_'])
                     <div>
                         <label class="block text-xs font-bold text-slate-700 mb-1">الدور / الصلاحية</label>
                         <select name="role" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
@@ -204,18 +206,12 @@
                     <div>
                         <label class="block text-xs font-bold text-slate-700 mb-1">كلمة المرور الجديدة (اختياري)</label>
                         <input type="password" name="password" placeholder="اتركها فارغة إن لم ترد تغييرها" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none" dir="ltr">
+                        <input type="password" name="password_confirmation" placeholder="أعد كتابة كلمة المرور" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none mt-2" dir="ltr" autocomplete="new-password">
+                        <p class="text-[11px] text-slate-500 mt-1">8 أحرف على الأقل، وتحتوي حروفاً وأرقاماً.</p>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1">المنظمة التابع لها</label>
-                        <select id="edit_organization_id" name="organization_id" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                            <option value="">بدون منظمة (عام / رئيسي)</option>
-                            @foreach($organizations as $org)
-                                <option value="{{ $org->id }}">{{ $org->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
+                    @include('users._scope', ['idPrefix' => 'edit_'])
                     <div>
                         <label class="block text-xs font-bold text-slate-700 mb-1">الدور / الصلاحية</label>
                         <select id="edit_role" name="role" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
@@ -247,13 +243,16 @@
         function openEditModal(user, userRole) {
             // تحديد مسار الفورم لتحديث المستخدم المختار
             const form = document.getElementById('editUserForm');
-            form.action = `/users/${user.id}`;
+            form.action = `{{ url('users') }}/${user.id}`;
 
             // تعبئة الحقول بالبيانات الحالية
             document.getElementById('edit_username').value = user.username || user.name || '';
             document.getElementById('edit_email').value = user.email || '';
             document.getElementById('edit_phone').value = user.phone || '';
-            document.getElementById('edit_organization_id').value = user.organization_id || '';
+            const orgSel = document.getElementById('edit_organization_id');
+            if (orgSel) { orgSel.value = user.organization_id || ''; orgSel.dispatchEvent(new Event('change')); }
+            const branchSel = document.getElementById('edit_branch_id');
+            if (branchSel) branchSel.value = user.branch_id || '';
             document.getElementById('edit_role').value = userRole || '';
             document.getElementById('edit_is_active').checked = user.is_active == 1;
 
@@ -261,4 +260,4 @@
             toggleModal('editUserModal');
         }
     </script>
-@endsection
+@endsection

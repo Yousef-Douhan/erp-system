@@ -12,10 +12,15 @@ use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
-    Route::get('register', [RegisteredUserController::class, 'create'])
-                ->name('register');
+    // التسجيل الذاتي مغلق افتراضياً: المستخدمون يُضافون من شاشة المستخدمين.
+    // لفتحه مؤقتاً: ALLOW_REGISTRATION=true في ملف .env ثم php artisan config:clear
+    if (config('auth.allow_registration')) {
+        Route::get('register', [RegisteredUserController::class, 'create'])
+                    ->name('register');
 
-    Route::post('register', [RegisteredUserController::class, 'store']);
+        Route::post('register', [RegisteredUserController::class, 'store'])
+                    ->middleware('throttle:5,1');
+    }
 
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
                 ->name('login');

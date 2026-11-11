@@ -20,11 +20,12 @@ class ProductUnitController extends Controller
     public function store(Request $request, Product $product)
     {
         $validated = $request->validate([
-            'unit_id' => 'required|exists:units,id',
+            'unit_id' => 'required|exists:units,id,deleted_at,NULL',
             'conversion_factor' => 'required|numeric|min:0.0001',
             'purchase_price' => 'required|numeric|min:0',
             'selling_price' => 'required|numeric|min:0',
-            'barcode' => 'nullable|string|max:100|unique:product_units,barcode',
+            // الباركود فريد داخل الصيدلية فقط
+            'barcode' => ['nullable', 'string', 'max:100', \Illuminate\Validation\Rule::unique('product_units', 'barcode')->where(fn ($q) => $q->whereIn('product_id', \App\Models\Product::query()->select('id')))],
             'is_default' => 'nullable',
         ]);
 
@@ -51,11 +52,11 @@ class ProductUnitController extends Controller
     public function update(Request $request, Product $product, ProductUnit $unit)
     {
         $validated = $request->validate([
-            'unit_id' => 'required|exists:units,id',
+            'unit_id' => 'required|exists:units,id,deleted_at,NULL',
             'conversion_factor' => 'required|numeric|min:0.0001',
             'purchase_price' => 'required|numeric|min:0',
             'selling_price' => 'required|numeric|min:0',
-            'barcode' => 'nullable|string|max:100|unique:product_units,barcode,' . $unit->id,
+            'barcode' => ['nullable', 'string', 'max:100', \Illuminate\Validation\Rule::unique('product_units', 'barcode')->where(fn ($q) => $q->whereIn('product_id', \App\Models\Product::query()->select('id')))->ignore($unit->id)],
             'is_default' => 'nullable',
         ]);
 

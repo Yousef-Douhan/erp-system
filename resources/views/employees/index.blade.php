@@ -42,7 +42,7 @@
                     <tr class="bg-slate-50/70 border-b border-slate-200 text-slate-500 text-xs font-semibold uppercase tracking-wider">
                         <th class="py-3.5 px-6">#</th>
                         <th class="py-3.5 px-6">اسم الموظف</th>
-                        <th class="py-3.5 px-6">المنظمة</th>
+                        <th class="py-3.5 px-6">الصيدلية</th>
                         <th class="py-3.5 px-6">الراتب</th>
                         <th class="py-3.5 px-6">الحالة</th>
                         <th class="py-3.5 px-6 text-center">الإجراءات</th>
@@ -84,7 +84,7 @@
                                 @csrf @method('PUT')
                                 <div class="p-6 space-y-4">
                                     <div>
-                                        <label class="block text-xs font-bold text-slate-700 mb-1">المنظمة</label>
+                                        <label class="block text-xs font-bold text-slate-700 mb-1">الصيدلية</label>
                                         <select name="organization_id" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs">
                                             @foreach($organizations as $org)
                                                 <option value="{{ $org->id }}" {{ $emp->organization_id == $org->id ? 'selected' : '' }}>{{ $org->name }}</option>
@@ -126,6 +126,7 @@
                     @endforelse
                 </tbody>
             </table>
+<div class="p-4">{{ $employees->links() }}</div>
         </div>
     </div>
 </div>
@@ -141,9 +142,9 @@
             @csrf
             <div class="p-6 space-y-4">
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">المنظمة التابع لها</label>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">الصيدلية التابع لها</label>
                     <select name="organization_id" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs">
-                        <option value="">اختر المنظمة...</option>
+                        <option value="">اختر الصيدلية...</option>
                         @foreach($organizations as $org)
                             <option value="{{ $org->id }}">{{ $org->name }}</option>
                         @endforeach

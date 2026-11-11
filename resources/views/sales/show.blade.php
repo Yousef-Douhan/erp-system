@@ -15,16 +15,32 @@
             </div>
         </div>
         
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+            <a href="{{ route('sales.receipt', $sale) }}" target="_blank" class="x-btn is-ghost is-sm">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg>
+                إيصال حراري
+            </a>
+
+            @if (Route::has('returns.create') && auth()->user()->can('return_sales') && $sale->items->contains(fn ($i) => $i->returnableQuantity() > 0))
+            <a href="{{ route('returns.create', $sale) }}" class="x-btn is-danger is-sm">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3"/></svg>
+                مرتجع
+            </a>
+            @endif
+
+            @can('update', $sale)
             <button onclick="openModal('addItemModal')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-md transition-all flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                 إضافة منتج للفاتورة
             </button>
+            @endcan
 
+            @can('pay', $sale)
             <button onclick="openModal('payModal')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-md transition-all flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a1 1 0 11-2 0 1 1 0 012 0z"/></svg>
                 تسجيل دفعة (سداد المتبقي)
             </button>
+            @endcan
         </div>
     </div>
 
@@ -66,7 +82,7 @@
         <!-- بطاقة الموظف المسؤول -->
         <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
             <span class="text-xs text-slate-400 block mb-1">الموظف المسؤول</span>
-            <span class="text-sm font-bold text-slate-800">{{ $sale->employee->name ?? '---' }}</span>
+            <span class="text-sm font-bold text-slate-800">{{ $sale->employee->username ?? '---' }}</span>
         </div>
 
         <!-- بطاقة حالة وطريقة الدفع المحدثة بالكامل -->
@@ -91,12 +107,23 @@
                                 'cash' => 'نقدي (Cash)',
                                 'bank_palestine' => 'بنك فلسطين',
                                 'palpay' => 'محفظة بال بي (PalPay)',
-                                'jawwal_pay' => 'جوال بي (Jawwal Pay)'
-                            ];
+                                'jawwal_pay' => 'جوال بي (Jawwal Pay)',
+                                'debt' => 'بيع آجل (دين على العميل)',
+                            ] + ($paymentMethodNames ?? []);
                         @endphp
                         {{ $methods[$rawMethod] ?? ($rawMethod ?: 'نقدي (Cash)') }}
                     </span>
                 </div>
+                @if($sale->cashRegister)
+                    <div class="text-xs text-slate-600">
+                        <span class="font-semibold text-slate-500">الخزينة:</span> {{ $sale->cashRegister->name }}
+                    </div>
+                @endif
+                @if($sale->prescription)
+                    <div class="text-xs text-slate-600">
+                        <span class="font-semibold text-slate-500">الوصفة الطبية:</span> د. {{ $sale->prescription->doctor_name }}{{ $sale->prescription->diagnosis ? ' — ' . $sale->prescription->diagnosis : '' }}
+                    </div>
+                @endif
                 @if(!empty($sale->wallet_phone))
                     <div class="text-xs text-slate-600">
                         <span class="font-semibold text-slate-500">رقم الحساب/المحفظة:</span> <span class="font-mono">{{ $sale->wallet_phone }}</span>
@@ -126,17 +153,26 @@
             <tbody class="divide-y divide-slate-200 text-sm text-slate-700">
                 @forelse($sale->items as $item)
                     <tr>
-                        <td class="px-6 py-4 font-semibold text-slate-900">{{ $item->product->name ?? 'منتج غير معروف' }}</td>
-                        <td class="px-6 py-4">{{ $item->quantity }}</td>
+                        <td class="px-6 py-4 font-semibold text-slate-900">
+                            {{ $item->product->name ?? 'منتج غير معروف' }}
+                            @if($item->batch)
+                                <div class="text-xs font-normal text-slate-500 mt-0.5">
+                                    دفعة: {{ $item->batch->batch_number }}@if($item->batch->expiry_date) — تنتهي {{ $item->batch->expiry_date }}@endif
+                                </div>
+                            @endif
+                        </td>
+                        <td class="px-6 py-4">{{ rtrim(rtrim(number_format($item->quantity, 2, '.', ''), '0'), '.') }} {{ $item->unit_name }}</td>
                         <td class="px-6 py-4">{{ number_format($item->unit_price, 2) }}</td>
                         <td class="px-6 py-4 text-rose-500">{{ number_format($item->discount, 2) }}</td>
                         <td class="px-6 py-4 font-bold text-slate-900">{{ number_format($item->total, 2) }}</td>
                         <td class="px-6 py-4 text-center">
+                            @can('update', $sale)
                             <form action="{{ route('sale-items.destroy', $item->id) }}" method="POST" onsubmit="return confirm('هل أنت متأكد من حذف هذا المنتج من الفاتورة؟');">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="text-rose-600 hover:text-rose-800 text-xs font-semibold px-2.5 py-1 bg-rose-50 rounded-lg">حذف</button>
                             </form>
+                            @endcan
                         </td>
                     </tr>
                 @empty
@@ -155,16 +191,45 @@
                 <span class="text-xs text-slate-500 block">إجمالي الفاتورة:</span>
                 <span class="text-lg font-black text-slate-900">{{ number_format($sale->total, 2) }}</span>
             </div>
+            @if ((float) $sale->returned_amount > 0)
+            <div>
+                <span class="text-xs text-slate-500 block">المرتجعات:</span>
+                <span class="text-lg font-black text-amber-700">− {{ number_format($sale->returned_amount, 2) }}</span>
+            </div>
+            @endif
             <div>
                 <span class="text-xs text-slate-500 block">المبلغ المدفوع:</span>
                 <span class="text-lg font-black text-emerald-600">{{ number_format($sale->paid_amount, 2) }}</span>
             </div>
             <div>
                 <span class="text-xs text-slate-500 block">المتبقي:</span>
-                <span class="text-lg font-black text-rose-600">{{ number_format($sale->total - $sale->paid_amount, 2) }}</span>
+                <span class="text-lg font-black text-rose-600">{{ number_format(\App\Services\SaleService::remaining($sale), 2) }}</span>
             </div>
         </div>
     </div>
+
+    @if ($sale->returns->isNotEmpty())
+    <section class="erp-card">
+        <div class="erp-card-head"><h2>مرتجعات هذه الفاتورة</h2></div>
+        <div class="x-table-wrap">
+            <table class="x-table">
+                <thead><tr><th>رقم المرتجع</th><th>التاريخ</th><th class="n">القيمة</th><th class="n">رُد نقداً</th><th class="n">خُفّض من الدين</th><th>المخزون</th></tr></thead>
+                <tbody>
+                    @foreach ($sale->returns as $ret)
+                        <tr>
+                            <td><a href="{{ route('returns.show', $ret) }}" class="num">{{ $ret->return_number }}</a></td>
+                            <td class="muted">{{ $ret->created_at->format('Y-m-d H:i') }}</td>
+                            <td class="n">{{ number_format($ret->total, 2) }}</td>
+                            <td class="n">{{ number_format($ret->refund_amount, 2) }}</td>
+                            <td class="n">{{ number_format($ret->debt_reduction, 2) }}</td>
+                            <td><span class="x-badge {{ $ret->restocked ? 'is-good' : 'is-warn' }}">{{ $ret->restocked ? 'أُعيد للمخزون' : 'تالف' }}</span></td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    </section>
+    @endif
 </div>
 
 <!-- Modal إضافة منتج للفاتورة -->
@@ -187,7 +252,7 @@
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">الكمية</label>
-                    <input type="number" step="0.01" name="quantity" value="1" class="w-full rounded-xl border-slate-200 text-sm" min="0.01" required>
+                    <input type="number" step="1" name="quantity" value="1" class="w-full rounded-xl border-slate-200 text-sm" min="1" required>
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">سعر الوحدة</label>
@@ -212,13 +277,13 @@
 <div id="payModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 hidden">
     <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-4 shadow-xl">
         <h3 class="text-lg font-bold text-slate-800">تسجيل دفعة جديدة</h3>
-        <p class="text-xs text-slate-400">المبلغ المتبقي الحالي: <span class="font-bold text-rose-600">{{ number_format($sale->total - $sale->paid_amount, 2) }}</span></p>
+        <p class="text-xs text-slate-400">المبلغ المتبقي الحالي: <span class="font-bold text-rose-600">{{ number_format(\App\Services\SaleService::remaining($sale), 2) }}</span></p>
         
         <form action="{{ route('sales.pay', $sale->id)}}" method="POST" class="space-y-4">
             @csrf
             <div>
                 <label class="block text-xs font-semibold text-slate-600 mb-1">المبلغ المراد دفعه</label>
-                <input type="number" step="0.01" name="amount" value="{{ $sale->total - $sale->paid_amount }}" max="{{ $sale->total - $sale->paid_amount }}" class="w-full rounded-xl border-slate-200 text-sm" min="0.01" required>
+                <input type="number" step="0.01" name="amount" value="{{ \App\Services\SaleService::remaining($sale) }}" max="{{ \App\Services\SaleService::remaining($sale) }}" class="w-full rounded-xl border-slate-200 text-sm" min="0.01" required>
             </div>
 
             <!-- خيارات الدفع -->

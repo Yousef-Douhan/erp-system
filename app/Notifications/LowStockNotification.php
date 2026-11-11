@@ -19,6 +19,17 @@ class LowStockNotification
 
     public function send()
     {
+        // عدم تكرار نفس التنبيه ما دام السابق لم يُقرأ بعد
+        $exists = NotificationModel::where('user_id', $this->user->id)
+            ->where('type', 'LowStock')
+            ->where('is_read', false)
+            ->where('message', 'like', '%(' . $this->product->name . ')%')
+            ->exists();
+
+        if ($exists) {
+            return null;
+        }
+
         return NotificationModel::create([
             'user_id' => $this->user->id,
             'type' => 'LowStock',

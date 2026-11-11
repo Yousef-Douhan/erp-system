@@ -19,7 +19,7 @@ class SupplierController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'organization_id' => 'required|exists:organizations,id',
+            'organization_id' => 'required|exists:organizations,id,deleted_at,NULL',
             'name'            => 'required|string|max:255',
             'company_name'    => 'nullable|string|max:255',
             'balance'         => 'required|numeric|min:0',
@@ -35,7 +35,7 @@ class SupplierController extends Controller
     public function update(Request $request, Supplier $supplier)
     {
         $validated = $request->validate([
-            'organization_id' => 'required|exists:organizations,id',
+            'organization_id' => 'required|exists:organizations,id,deleted_at,NULL',
             'name'            => 'required|string|max:255',
             'company_name'    => 'nullable|string|max:255',
             'balance'         => 'required|numeric|min:0',

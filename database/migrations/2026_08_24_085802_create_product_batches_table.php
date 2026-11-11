@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('product_batches', function (Blueprint $table) {
             $table->id();
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('warehouse_id')->nullable()->constrained()->nullOnDelete(); // أضفنا هذا الحقل
+            $table->foreignId('warehouse_id')->nullable(); // القيد يضاف لاحقاً في fix_foreign_keys
             $table->string('batch_number');
             $table->date('expiry_date')->nullable();
             $table->decimal('cost_price', 10, 2)->default(0); // تم تعديلها لتتوافق مع cost_price

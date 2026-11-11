@@ -26,7 +26,7 @@ class ManufacturerController extends Controller
         $manufacturer = Manufacturer::create([
             'name' => $validated['name'],
             'contact_details' => $validated['contact_details'] ?? null,
-            'organization_id' => 1 // أو auth()->user()->organization_id حسب نظام المصادقة لديك
+            'organization_id' => $this->currentOrganizationId(),
         ]);
 
         return response()->json([

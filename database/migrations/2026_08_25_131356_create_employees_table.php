@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -11,6 +12,14 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // الجدول يُنشأ في migration سابق (2026_08_24_085420)، هنا فقط نضيف الحالة terminated
+        if (Schema::hasTable('employees')) {
+            if (DB::getDriverName() === 'mysql') {
+                DB::statement("ALTER TABLE employees MODIFY status ENUM('active','inactive','terminated') NOT NULL DEFAULT 'active'");
+            }
+            return;
+        }
+
         Schema::create('employees', function (Blueprint $table) {
             $table->id();
             $table->foreignId('organization_id')->constrained('organizations')->cascadeOnDelete();
@@ -29,6 +38,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('employees');
+        // الحذف يتم في migration الإنشاء الأصلي
     }
 };

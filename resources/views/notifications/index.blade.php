@@ -118,7 +118,7 @@ $(document).ready(function() {
         let btn = $(this);
 
         $.ajax({
-            url: '/notifications/' + notificationId + '/read',
+            url: "{{ url('notifications') }}/" + notificationId + '/read',
             type: 'POST',
             data: {
                 _token: '{{ csrf_token() }}'

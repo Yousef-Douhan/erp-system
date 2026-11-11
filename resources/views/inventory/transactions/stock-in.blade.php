@@ -27,7 +27,16 @@
                 @csrf
 
                 <!-- بيانات الفاتورة العامة -->
-                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-2">المستودع</label>
+                        <select name="warehouse_id" class="w-full text-xs rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500 py-2.5">
+                            <option value="">المستودع الرئيسي (افتراضي)</option>
+                            @foreach($warehouses ?? [] as $warehouse)
+                                <option value="{{ $warehouse->id }}" @selected(old('warehouse_id') == $warehouse->id)>{{ $warehouse->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-700 mb-2">رقم المرجع / الفاتورة (Reference Number)</label>
                         <input type="text" name="reference_number" value="{{ old('reference_number') }}" placeholder="مثال: INV-2026-001" 
@@ -57,7 +66,7 @@
                                 <select name="items[0][product_id]" required class="w-full text-xs rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500 py-2">
                                     <option value="">اختر المنتج...</option>
                                     @foreach($products as $product)
-                                        <option value="{{ $product->id }}">{{ $product->name }} (المتوفر حالياً: {{ $product->quantity ?? 0 }})</option>
+                                        <option value="{{ $product->id }}">{{ $product->name }} (المتوفر حالياً: {{ $product->stock_quantity ?? 0 }})</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -103,7 +112,7 @@
                     <select name="items[${rowIndex}][product_id]" required class="w-full text-xs rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500 py-2">
                         <option value="">اختر المنتج...</option>
                         @foreach($products as $product)
-                            <option value="{{ $product->id }}">{{ $product->name }} (المتوفر حالياً: {{ $product->quantity ?? 0 }})</option>
+                            <option value="{{ $product->id }}">{{ $product->name }} (المتوفر حالياً: {{ $product->stock_quantity ?? 0 }})</option>
                         @endforeach
                     </select>
                 </div>
@@ -137,4 +146,4 @@
         });
     </script>
     @endpush
-</x-app-layout>
+</x-app-layout>

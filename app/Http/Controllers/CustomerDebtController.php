@@ -3,88 +3,82 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Models\CustomerTransaction;
+use App\Services\CustomerLedger;
+use App\Support\ArabicSearch;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class CustomerDebtController extends Controller
 {
     // 1. عرض قائمة العملاء وديونهم (الدفتر)
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Customer::class);
+
         $search = $request->input('search');
 
-        $customers = Customer::when($search, function ($query, $search) {
-            return $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%");
-            });
-        })
+        $customers = Customer::visibleTo($request->user())->when($search, fn ($query, $search) => ArabicSearch::apply($query, $search, ['name', 'phone']))
             ->latest()
             ->paginate(15)
             ->withQueryString();
 
         // إجمالي ديون كل الزبائن
-        $totalAllCustomersDebt = Customer::sum('balance');
+        $totalAllCustomersDebt = Customer::visibleTo($request->user())->sum('balance');
 
         return view('customers.debts.index', compact('customers', 'totalAllCustomersDebt'));
     }
 
-    // 2. تحديث الرصيد وتسجيل الحركة (سداد أو إضافة دين)
+    // 2. تسجيل حركة على حساب العميل (سداد أو إضافة دين)
     public function update(Request $request, $id)
     {
         $customer = Customer::findOrFail($id);
 
         $request->validate([
             'amount' => 'required|numeric|min:0.01',
-            'type' => 'required|in:add,subtract', // add = إضافة دين، subtract = سداد دفعة
+            'type'   => 'required|in:add,subtract', // add = إضافة دين، subtract = سداد دفعة
         ]);
 
-        DB::transaction(function () use ($request, $customer) {
+        // السداد متاح للبائع، أما إضافة دين يدوي (بدون فاتورة) فتحتاج صلاحية تعديل العملاء والديون
+        $this->authorize($request->type === 'add' ? 'addDebt' : 'recordPayment', $customer);
+
+        $amount = round((float) $request->amount, 2);
+
+        try {
             if ($request->type === 'add') {
-                $customer->balance += $request->amount;
-                $notes = 'إضافة دين يدوي بقيمة ' . $request->amount . ' ₪';
+                CustomerLedger::addDebt($customer, $amount, 'إضافة دين يدوي بقيمة ' . number_format($amount, 2) . ' ₪', 'manual_debt');
             } else {
-                $customer->balance -= $request->amount;
-                if ($customer->balance < 0) {
-                    $customer->balance = 0;
-                }
-                $notes = 'سداد دفعة بقيمة ' . $request->amount . ' ₪';
+                CustomerLedger::recordPayment($customer, $amount, 'سداد دفعة بقيمة ' . number_format($amount, 2) . ' ₪', 'payment');
             }
-
-            $customer->save();
-
-            // حفظ الحركة في جدول الحركات لكي تظهر في كشف الحساب مع التاريخ
-            DB::table('customer_transactions')->insert([
-                'customer_id' => $customer->id,
-                'type' => $request->type,
-                'amount' => $request->amount,
-                'notes' => $notes,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        });
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
 
         return response()->json([
             'success' => true,
-            'message' => 'تم تحديث حساب العميل وتسجيل الحركة بنجاح'
+            'message' => 'تم تحديث حساب العميل وتسجيل الحركة بنجاح',
+            'balance' => (float) $customer->fresh()->balance,
         ]);
     }
 
     // 3. جلب تفاصيل كشف الحساب (الفواتير + حركات السداد والإضافة)
     public function ledger($id)
     {
-        $customer = Customer::with(['sales.items.product'])->findOrFail($id);
+        $customer = Customer::findOrFail($id);
+        $this->authorize('view', $customer);
 
-        // جلب الحركات والسدادات الخاصة بالعميل مرتبة من الأحدث
-        $payments = DB::table('customer_transactions')
-            ->where('customer_id', $id)
+        $sales = $customer->sales()->with('items.product:id,name')->latest()->get();
+
+        $payments = CustomerTransaction::where('customer_id', $id)
             ->orderBy('created_at', 'desc')
             ->get();
 
         return response()->json([
             'customer' => $customer,
-            'sales' => $customer->sales ?? [],
-            'payments' => $payments ?? []
+            'sales'    => $sales,
+            'payments' => $payments,
         ]);
     }
 }

@@ -64,8 +64,8 @@
             </div>
 
             <div>
-                <label class="block text-xs font-bold text-slate-600 mb-1">الرصيد بعد الحركة (Balance After)</label>
-                <input type="number" step="0.01" id="balance_after" name="balance_after" value="0" required class="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs">
+                <label class="block text-xs font-bold text-slate-600 mb-1">الرصيد بعد الحركة (يُحسب تلقائياً)</label>
+                <input type="number" step="0.01" id="balance_after" value="0" readonly disabled class="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs bg-slate-50 text-slate-400">
             </div>
 
             <div class="flex items-center gap-2 pt-2">
@@ -131,7 +131,7 @@
 <script>
     function editItem(id, warehouseId, productId, type, qtyIn, qtyOut, balanceAfter) {
         const form = document.getElementById('crud-form');
-        form.action = `/inventory-transactions/${id}`;
+        form.action = `{{ url('inventory-transactions') }}/${id}`;
         document.getElementById('form-method').value = 'PUT';
         
         document.getElementById('warehouse_id').value = warehouseId;
@@ -164,4 +164,4 @@
         document.getElementById('cancel-btn').classList.add('hidden');
     }
 </script>
-@endsection
+@endsection

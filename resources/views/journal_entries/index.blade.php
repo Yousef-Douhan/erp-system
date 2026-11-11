@@ -23,7 +23,7 @@
             <div class="mb-4">
                 <label class="block text-xs font-bold text-slate-600 mb-1">المنظمة التابعة لها</label>
                 <select name="organization_id" required class="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
-                    @foreach(\App\Models\Organization::all() as $org)
+                    @foreach($organizations as $org)
                         <option value="{{ $org->id }}">{{ $org->name }}</option>
                     @endforeach
                 </select>
@@ -44,6 +44,18 @@
                 <textarea id="description" name="description" rows="3" required class="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
             </div>
             
+            <!-- سطور القيد: يجب أن يتساوى إجمالي المدين مع إجمالي الدائن -->
+            <div id="lines-section" class="space-y-2">
+                <label class="block text-xs font-bold text-slate-600">سطور القيد (المدين = الدائن)</label>
+                <div id="lines-container" class="space-y-2"></div>
+                <button type="button" onclick="addLine()" class="w-full py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200 transition">+ إضافة سطر</button>
+                <div class="flex justify-between text-xs bg-slate-50 p-2 rounded-xl">
+                    <span>مدين: <b id="total-debit">0.00</b></span>
+                    <span>دائن: <b id="total-credit">0.00</b></span>
+                    <span id="balance-status" class="font-bold text-rose-600">غير متوازن</span>
+                </div>
+            </div>
+
             <div class="flex items-center gap-2 pt-2">
                 <button type="submit" id="submit-btn" class="w-full py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 shadow-md transition">حفظ القيد</button>
                 <button type="button" id="cancel-btn" onclick="resetForm()" class="hidden w-full py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200 transition">إلغاء</button>
@@ -122,6 +134,44 @@
 </div>
 
 <script>
+    const accountOptions = `@foreach($accountsList as $acc)<option value="{{ $acc->id }}">{{ $acc->account_code }} - {{ $acc->name }}</option>@endforeach`;
+    let lineIndex = 0;
+
+    function addLine() {
+        const container = document.getElementById('lines-container');
+        const row = document.createElement('div');
+        row.className = 'grid grid-cols-12 gap-1 items-center';
+        row.innerHTML = `
+            <select name="lines[${lineIndex}][account_id]" required class="col-span-6 px-2 py-2 rounded-xl border border-slate-200 text-xs bg-white">
+                <option value="">-- الحساب --</option>${accountOptions}
+            </select>
+            <input type="number" step="0.01" min="0" value="0" name="lines[${lineIndex}][debit]" oninput="updateTotals()" placeholder="مدين" class="line-debit col-span-2 px-2 py-2 rounded-xl border border-slate-200 text-xs">
+            <input type="number" step="0.01" min="0" value="0" name="lines[${lineIndex}][credit]" oninput="updateTotals()" placeholder="دائن" class="line-credit col-span-3 px-2 py-2 rounded-xl border border-slate-200 text-xs">
+            <button type="button" onclick="this.parentElement.remove(); updateTotals();" class="col-span-1 text-rose-600 font-bold">✕</button>`;
+        container.appendChild(row);
+        lineIndex++;
+    }
+
+    function updateTotals() {
+        let debit = 0, credit = 0;
+        document.querySelectorAll('.line-debit').forEach(i => debit += parseFloat(i.value) || 0);
+        document.querySelectorAll('.line-credit').forEach(i => credit += parseFloat(i.value) || 0);
+        document.getElementById('total-debit').innerText = debit.toFixed(2);
+        document.getElementById('total-credit').innerText = credit.toFixed(2);
+        const status = document.getElementById('balance-status');
+        const balanced = debit > 0 && Math.abs(debit - credit) < 0.005;
+        status.innerText = balanced ? 'متوازن ✓' : 'غير متوازن';
+        status.className = 'font-bold ' + (balanced ? 'text-emerald-600' : 'text-rose-600');
+    }
+
+    function toggleLines(show) {
+        const section = document.getElementById('lines-section');
+        section.classList.toggle('hidden', !show);
+        section.querySelectorAll('input, select').forEach(el => el.disabled = !show);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => { addLine(); addLine(); });
+
     function showDetails(number, date, desc, orgName) {
         document.getElementById('modal-number').innerText = number;
         document.getElementById('modal-date').innerText = date;
@@ -141,7 +191,7 @@
 
     function editItem(id, number, date, desc, orgId) {
         const form = document.getElementById('crud-form');
-        form.action = `/journal-entries/${id}`;
+        form.action = `{{ url('journal-entries') }}/${id}`;
         document.getElementById('form-method').value = 'PUT';
         document.getElementById('entry_number').value = number;
         document.getElementById('entry_date').value = date;
@@ -152,6 +202,7 @@
             orgSelect.value = orgId;
         }
 
+        toggleLines(false);
         document.getElementById('form-title').innerText = 'تعديل القيد';
         const btn = document.getElementById('submit-btn');
         btn.innerText = 'تحديث البيانات';
@@ -165,6 +216,8 @@
         form.action = "{{ route('journal-entries.store') }}";
         document.getElementById('form-method').value = 'POST';
         form.reset();
+        toggleLines(true);
+        updateTotals();
         document.getElementById('form-title').innerText = 'إنشاء قيد يومي جديد';
         const btn = document.getElementById('submit-btn');
         btn.innerText = 'حفظ القيد';
@@ -172,4 +225,4 @@
         document.getElementById('cancel-btn').classList.add('hidden');
     }
 </script>
-@endsection
+@endsection

@@ -125,7 +125,7 @@
 <script>
     function editItem(id, customerId, doctorName, diagnosis, isFilled) {
         const form = document.getElementById('crud-form');
-        form.action = `/prescriptions/${id}`;
+        form.action = `{{ url('prescriptions') }}/${id}`;
         document.getElementById('form-method').value = 'PUT';
         document.getElementById('customer_id').value = customerId;
         document.getElementById('doctor_name').value = doctorName;
@@ -153,4 +153,4 @@
         document.getElementById('cancel-btn').classList.add('hidden');
     }
 </script>
-@endsection
+@endsection

@@ -2,13 +2,22 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Traits\BelongsToTenant;
 use App\Traits\AuditLogsable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Organization extends Model
 {
-    use HasFactory, AuditLogsable;
+    use HasFactory, AuditLogsable, BelongsToTenant, SoftDeletes;
+
+
+    /** غير مدير النظام يرى صيدليته فقط */
+    protected static function tenantScope(\Illuminate\Database\Eloquent\Builder $query): void
+    {
+        $query->where('organizations.id', \App\Support\Tenancy::orgId() ?? 0);
+    }
 
     protected $fillable = [
         'name',

@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('products', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('organization_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('organization_id'); // القيد يضاف لاحقاً في fix_foreign_keys
             $table->foreignId('category_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('brand_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('unit_id')->nullable()->constrained()->nullOnDelete();

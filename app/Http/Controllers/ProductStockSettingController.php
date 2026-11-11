@@ -13,7 +13,7 @@ class ProductStockSettingController extends Controller
     public function index()
     {
         $settings = ProductStockSetting::with(['product', 'warehouse'])->latest()->paginate(10);
-        $products = Product::all();
+        $products = Product::where('is_active', true)->orderBy('name')->get();
         $warehouses = Warehouse::all();
 
         return view('stock_settings.index', compact('settings', 'products', 'warehouses'));
@@ -23,8 +23,8 @@ class ProductStockSettingController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'product_id'   => 'required|exists:products,id',
-            'warehouse_id' => 'required|exists:warehouses,id',
+            'product_id'   => 'required|exists:products,id,deleted_at,NULL',
+            'warehouse_id' => 'required|exists:warehouses,id,deleted_at,NULL',
             'min_qty'      => 'required|integer|min:0',
             'max_qty'      => 'required|integer|min:0|gte:min_qty',
         ]);
@@ -39,8 +39,8 @@ class ProductStockSettingController extends Controller
     public function update(Request $request, ProductStockSetting $stockSetting)
     {
         $validated = $request->validate([
-            'product_id'   => 'required|exists:products,id',
-            'warehouse_id' => 'required|exists:warehouses,id',
+            'product_id'   => 'required|exists:products,id,deleted_at,NULL',
+            'warehouse_id' => 'required|exists:warehouses,id,deleted_at,NULL',
             'min_qty'      => 'required|integer|min:0',
             'max_qty'      => 'required|integer|min:0|gte:min_qty',
         ]);

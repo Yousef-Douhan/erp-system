@@ -27,7 +27,7 @@ class UnitController extends Controller
             'short_name' => $validated['short_name'] ?? null,
             'description' => $validated['description'] ?? null,
             'is_active' => $request->has('is_active'),
-            'organization_id' => 1, // أو auth()->user()->organization_id حسب نظامك
+            'organization_id' => $this->currentOrganizationId(),
         ]);
 
         return redirect()->route('units.index')->with('success', 'تم إضافة الوحدة بنجاح.');

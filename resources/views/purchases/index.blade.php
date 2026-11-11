@@ -44,6 +44,7 @@
                     {{ isset($editPurchase) ? 'تعديل فاتورة رقم: ' . $editPurchase->invoice_number : 'إضافة فاتورة شراء جديدة' }}
                 </h3>
 
+                    @if (isset($editPurchase) ? auth()->user()->can('update', $editPurchase) : auth()->user()->can('create', \App\Models\Purchase::class))
                 <form action="{{ isset($editPurchase) ? route('purchases.update', $editPurchase->id) : route('purchases.store') }}" method="POST" class="space-y-4">
                     @csrf
                     @if(isset($editPurchase))
@@ -97,6 +98,9 @@
                         </button>
                     </div>
                 </form>
+                    @else
+                        <p class="text-xs text-slate-500 leading-6">ليس لديك صلاحية {{ isset($editPurchase) ? 'تعديل' : 'تسجيل' }} فواتير الشراء.</p>
+                    @endif
             </div>
         </div>
 
@@ -113,7 +117,7 @@
                     <div class="grid grid-cols-2 gap-4 text-xs text-slate-700">
                         <p><span class="font-bold text-slate-500">المورد:</span> {{ $showPurchase->supplier->name ?? '---' }}</p>
                         <p><span class="font-bold text-slate-500">الفرع:</span> {{ $showPurchase->branch->name ?? '---' }}</p>
-                        <p><span class="font-bold text-slate-500">الموظف:</span> {{ $showPurchase->employee->name ?? '---' }}</p>
+                        <p><span class="font-bold text-slate-500">الموظف:</span> {{ $showPurchase->employee->username ?? '---' }}</p>
                         <p><span class="font-bold text-slate-500">الحالة:</span> {{ $showPurchase->status }}</p>
                         <p><span class="font-bold text-slate-500">الإجمالي:</span> <span class="font-bold text-slate-900">{{ number_format($showPurchase->total, 2) }}</span></p>
                         <p><span class="font-bold text-slate-500">المدفوع:</span> <span class="font-bold text-emerald-600">{{ number_format($showPurchase->paid_amount, 2) }}</span></p>
@@ -146,11 +150,13 @@
                                             <td class="px-3 py-2">{{ number_format($item->unit_cost, 2) }}</td>
                                             <td class="px-3 py-2 font-bold">{{ number_format($item->total, 2) }}</td>
                                             <td class="px-3 py-2 text-center">
+                                                @can('update', $showPurchase)
                                                 <form action="{{ route('purchase-items.destroy', $item->id) }}" method="POST" onsubmit="return confirm('هل أنت متأكد من حذف هذا المنتج؟')">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="text-rose-600 hover:underline">حذف</button>
                                                 </form>
+                                                @endcan
                                             </td>
                                         </tr>
                                     @empty
@@ -163,13 +169,14 @@
                         </div>
 
                         <!-- نموذج سريع لإضافة منتج لهذه الفاتورة (محدث بقائمة منسدلة لأسماء المنتجات) -->
+                        @can('update', $showPurchase)
                         <form action="{{ route('purchase-items.store', $showPurchase->id) }}" method="POST" class="grid grid-cols-1 md:grid-cols-6 gap-2 pt-2">
                             @csrf
                             
                             <!-- قائمة منسدلة لاختيار اسم المنتج بدلاً من الرقم الثابت -->
                             <select name="product_id" required class="rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white text-slate-700">
                                 <option value="">اختر المنتج...</option>
-                                @foreach(\App\Models\Product::all() as $product)
+                                @foreach($products as $product)
                                     <option value="{{ $product->id }}">{{ $product->name }}</option>
                                 @endforeach
                             </select>
@@ -183,6 +190,72 @@
                                 + إضافة
                             </button>
                         </form>
+                        @endcan
+                    </div>
+
+                    {{-- ================= دفعات المورد ================= --}}
+                    @php $purchaseRemaining = round(max(0, (float) $showPurchase->total - (float) $showPurchase->paid_amount), 2); @endphp
+                    <div class="mt-4 pt-4 border-t border-indigo-100" style="display:grid;gap:12px">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+                            <h4 class="text-xs font-bold text-slate-800">دفعات المورد على هذه الفاتورة</h4>
+                            <span class="x-badge {{ $purchaseRemaining > 0 ? 'is-warn' : 'is-good' }}">{{ $purchaseRemaining > 0 ? 'المتبقي ' . number_format($purchaseRemaining, 2) . ' ₪' : 'مسددة بالكامل' }}</span>
+                        </div>
+
+                        @if ($showPurchase->payments->isNotEmpty())
+                            <div class="erp-card x-table-wrap">
+                                <table class="x-table">
+                                    <thead><tr><th>التاريخ</th><th>الطريقة</th><th>بواسطة</th><th>مرجع</th><th class="n">المبلغ</th></tr></thead>
+                                    <tbody>
+                                        @foreach ($showPurchase->payments as $pay)
+                                            <tr>
+                                                <td class="muted">{{ $pay->created_at->format('Y-m-d H:i') }}</td>
+                                                <td>{{ $pay->payment_method === 'cash' ? 'نقداً' . ($pay->cashRegister ? ' — ' . $pay->cashRegister->name : '') : 'تحويل بنكي' }}</td>
+                                                <td class="muted">{{ $pay->user->username ?? '—' }}</td>
+                                                <td class="muted">{{ $pay->reference ?: '—' }}</td>
+                                                <td class="n" style="font-weight:600">{{ number_format($pay->amount, 2) }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+
+                        @if ($purchaseRemaining > 0 && auth()->user()->can('pay', $showPurchase))
+                            <form method="POST" action="{{ route('purchases.pay', $showPurchase) }}" class="erp-card x-body is-top x-fields" id="supplierPayForm">
+                                @csrf
+                                <div class="x-field">
+                                    <label for="payAmount">المبلغ</label>
+                                    <input type="number" step="0.01" min="0.01" max="{{ $purchaseRemaining }}" name="amount" id="payAmount" value="{{ old('amount', $purchaseRemaining) }}" required>
+                                </div>
+                                <div class="x-field">
+                                    <label for="payMethod">الطريقة</label>
+                                    <select name="payment_method" id="payMethod">
+                                        <option value="cash" @selected(old('payment_method', 'cash') === 'cash')>نقداً من خزينة</option>
+                                        <option value="bank" @selected(old('payment_method') === 'bank')>تحويل بنكي</option>
+                                    </select>
+                                </div>
+                                <div class="x-field" id="payRegisterField">
+                                    <label for="payRegister">الخزينة</label>
+                                    <select name="cash_register_id" id="payRegister">
+                                        @foreach ($registers as $r)
+                                            <option value="{{ $r->id }}" @selected((int) old('cash_register_id') === $r->id)>{{ $r->name }} — {{ number_format($r->current_balance, 2) }} ₪</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="x-field">
+                                    <label for="payRef">مرجع (اختياري)</label>
+                                    <input type="text" name="reference" id="payRef" maxlength="100" placeholder="رقم الحوالة أو الشيك">
+                                </div>
+                                <div class="x-actions"><button class="x-btn">تسجيل الدفعة</button></div>
+                            </form>
+                            <script>
+                            (function () {
+                                const m = document.getElementById('payMethod'), f = document.getElementById('payRegisterField');
+                                const sync = () => { f.hidden = m.value !== 'cash'; f.querySelector('select').disabled = m.value !== 'cash'; };
+                                m.addEventListener('change', sync); sync();
+                            })();
+                            </script>
+                        @endif
                     </div>
 
                 </div>
@@ -226,14 +299,18 @@
                                     <a href="{{ route('purchases.index', ['show' => $purchase->id]) }}" class="text-slate-600 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-lg font-semibold">عرض</a>
                                     
                                     <!-- زر التعديل (Edit) -->
+                                    @can('update', $purchase)
                                     <a href="{{ route('purchases.index', ['edit' => $purchase->id]) }}" class="text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg font-semibold">تعديل</a>
+                                    @endcan
                                     
                                     <!-- زر الحذف (Destroy) -->
+                                    @can('delete', $purchase)
                                     <form action="{{ route('purchases.destroy', $purchase->id) }}" method="POST" onsubmit="return confirm('هل أنت متأكد من الحذف؟');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="text-rose-600 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded-lg font-semibold">حذف</button>
                                     </form>
+                                    @endcan
                                 </td>
                             </tr>
                         @empty

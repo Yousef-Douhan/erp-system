@@ -12,12 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('sales', function (Blueprint $table) {
-            // السماح بأن يكون customer_id اختيارياً إذا لم يكن مسموحاً من قبل
-            try {
-                $table->foreignId('customer_id')->nullable()->change();
-            } catch (\Exception $e) {
-                // تجاهل إذا كان مسموحاً مسبقاً
-            }
+            // customer_id أصبح nullable في migration سابق (make_customer_id_nullable_in_sales_table)
 
             // إضافة اسم العميل النصي فقط إذا لم يكن موجوداً
             if (!Schema::hasColumn('sales', 'customer_name')) {
@@ -47,7 +42,11 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('sales', function (Blueprint $table) {
-            $table->dropColumn(['customer_name', 'discount', 'payment_method', 'wallet_phone']);
+            foreach (['discount'] as $column) {
+                if (Schema::hasColumn('sales', $column)) {
+                    $table->dropColumn($column);
+                }
+            }
         });
     }
 };

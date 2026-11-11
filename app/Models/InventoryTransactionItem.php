@@ -10,7 +10,9 @@ class InventoryTransactionItem extends Model
 {
     use HasFactory, AuditLogsable;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'inventory_transaction_id', 'product_id', 'quantity', 'purchase_price', 'selling_price',
+    ];
 
     public function transaction()
     {
@@ -19,6 +21,6 @@ class InventoryTransactionItem extends Model
 
     public function product()
     {
-        return $this->belongsTo(Product::class);
+        return $this->belongsTo(Product::class)->withTrashed();
     }
 }

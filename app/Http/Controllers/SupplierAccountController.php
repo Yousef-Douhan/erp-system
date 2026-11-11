@@ -18,26 +18,33 @@ class SupplierAccountController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'supplier_id' => 'required|exists:suppliers,id',
+            'supplier_id' => 'required|exists:suppliers,id,deleted_at,NULL',
             'transaction_type' => 'required|string',
             'debit' => 'required|numeric|min:0',
             'credit' => 'required|numeric|min:0',
         ]);
 
-        // حساب الرصيد التراكمي للمورد تلقائياً بناءً على آخر حركة له
-        $lastAccount = SupplierAccount::where('supplier_id', $request->supplier_id)->latest()->first();
-        $previousBalance = $lastAccount ? $lastAccount->balance : 0;
+        // رصيد المورد = المبلغ المستحق له علينا: الدائن يزيده (مشتريات) والمدين ينقصه (دفعات)
+        \Illuminate\Support\Facades\DB::transaction(function () use (&$validated) {
+            $supplier = Supplier::whereKey($validated['supplier_id'])->lockForUpdate()->firstOrFail();
+            $supplier->balance = round((float) $supplier->balance + (float) $validated['credit'] - (float) $validated['debit'], 2);
+            $supplier->save();
 
-        // المعادلة للموردين (عادة الرصيد السابق + المدين - الدائن أو العكس حسب طبيعة النظام، هنا اعتمدنا نفس المنطق)
-        $validated['balance'] = $previousBalance + $request->debit - $request->credit;
-
-        SupplierAccount::create($validated);
+            $validated['balance'] = $supplier->balance;
+            SupplierAccount::create($validated);
+        });
 
         return back()->with('success', 'تم تسجيل المعاملة المالية للمورد بنجاح.');
     }
 
     public function show(SupplierAccount $supplierAccount)
     {
-        return view('supplier_accounts.show', compact('supplierAccount'));
+        $supplierAccount->load('supplier');
+        $statement = SupplierAccount::where('supplier_id', $supplierAccount->supplier_id)
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->paginate(25);
+
+        return view('supplier_accounts.show', compact('supplierAccount', 'statement'));
     }
 }

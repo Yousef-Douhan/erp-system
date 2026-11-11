@@ -12,17 +12,17 @@ class PrescriptionController extends Controller
     public function index()
     {
         $prescriptions = Prescription::with('customer')->latest()->paginate(15);
-        $customers = Customer::all();
+        $customers = Customer::visibleTo(auth()->user())->orderBy('name')->get(['id', 'name', 'phone']);
         return view('prescriptions.index', compact('prescriptions', 'customers'));
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'customer_id' => 'required|exists:customers,id',
+            'customer_id' => 'required|exists:customers,id,deleted_at,NULL',
             'doctor_name' => 'required|string|max:255',
             'diagnosis' => 'nullable|string',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,pdf|max:2048',
+            'image' => 'nullable|file|mimes:jpeg,png,jpg,pdf|max:2048',
             'is_filled' => 'boolean',
         ]);
 
@@ -40,10 +40,10 @@ class PrescriptionController extends Controller
     public function update(Request $request, Prescription $prescription)
     {
         $validated = $request->validate([
-            'customer_id' => 'required|exists:customers,id',
+            'customer_id' => 'required|exists:customers,id,deleted_at,NULL',
             'doctor_name' => 'required|string|max:255',
             'diagnosis' => 'nullable|string',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,pdf|max:2048',
+            'image' => 'nullable|file|mimes:jpeg,png,jpg,pdf|max:2048',
             'is_filled' => 'boolean',
         ]);
 

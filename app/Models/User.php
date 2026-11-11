@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Traits\AuditLogsable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -18,10 +19,11 @@ use App\Models\Notification; // <--- تأكد من إضافة هذا السطر 
  */
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, HasRoles, AuditLogsable;
+    use HasFactory, Notifiable, HasRoles, AuditLogsable, SoftDeletes;
 
     protected $fillable = [
         'organization_id',
+        'branch_id',
         'username',
         'email',
         'phone',
@@ -34,19 +36,28 @@ class User extends Authenticatable
         'remember_token',
     ];
 
-    protected function casts(): array
-    {
-        return [
+    // Laravel 10 يستخدم الخاصية $casts (الدالة casts() مدعومة فقط من Laravel 11)
+    protected $casts = [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
         ];
-    }
 
     // علاقة المستخدم مع المنظمة
     public function organization()
     {
-        return $this->belongsTo(Organization::class);
+        return $this->belongsTo(Organization::class)->withTrashed();
+    }
+
+    // الفرع الذي يعمل فيه (فارغ = على مستوى الصيدلية كلها)
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class)->withTrashed();
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return \App\Support\Tenancy::isSuperAdmin($this);
     }
 
     /**

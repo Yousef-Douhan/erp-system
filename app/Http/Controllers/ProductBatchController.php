@@ -13,7 +13,7 @@ class ProductBatchController extends Controller
     public function indexAll()
     {
         $batches = ProductBatch::with(['product', 'warehouse'])->latest()->paginate(10);
-        $products = Product::all();
+        $products = Product::where('is_active', true)->orderBy('name')->get();
         $warehouses = Warehouse::all(); // <-- جلب المستودعات للقائمة المنسدلة
 
         return view('batches.index', compact('batches', 'products', 'warehouses'));
@@ -22,14 +22,19 @@ class ProductBatchController extends Controller
     public function storeAll(Request $request)
     {
         $validated = $request->validate([
-            'product_id'         => 'required|exists:products,id',
-            'warehouse_id'       => 'required|exists:warehouses,id', // <-- مطلوب الآن
+            'product_id'         => 'required|exists:products,id,deleted_at,NULL',
+            'warehouse_id'       => 'required|exists:warehouses,id,deleted_at,NULL', // <-- مطلوب الآن
             'batch_number'       => 'required|string|max:100',
             'manufacturing_date' => 'nullable|date',
             'expiry_date'        => 'nullable|date|after_or_equal:manufacturing_date',
             'cost_price'         => 'required|numeric|min:0',
             'quantity'           => 'required|integer|min:0',
         ]);
+
+        \App\Support\PriceGuard::check(['cost_price' => [$validated['product_id'], $validated['cost_price']]]);
+        // المستودع والصنف يجب أن يكونا من صيدلية/فرع المستخدم
+        \App\Models\Warehouse::findOrFail($validated['warehouse_id']);
+        \App\Models\Product::findOrFail($validated['product_id']);
 
         ProductBatch::create($validated);
 
@@ -40,14 +45,19 @@ class ProductBatchController extends Controller
     public function updateAll(Request $request, ProductBatch $batch)
     {
         $validated = $request->validate([
-            'product_id'         => 'required|exists:products,id',
-            'warehouse_id'       => 'required|exists:warehouses,id',
+            'product_id'         => 'required|exists:products,id,deleted_at,NULL',
+            'warehouse_id'       => 'required|exists:warehouses,id,deleted_at,NULL',
             'batch_number'       => 'required|string|max:100',
             'manufacturing_date' => 'nullable|date',
             'expiry_date'        => 'nullable|date|after_or_equal:manufacturing_date',
             'cost_price'         => 'required|numeric|min:0',
             'quantity'           => 'required|integer|min:0',
         ]);
+
+        \App\Support\PriceGuard::check(['cost_price' => [$validated['product_id'], $validated['cost_price']]]);
+        // المستودع والصنف يجب أن يكونا من صيدلية/فرع المستخدم
+        \App\Models\Warehouse::findOrFail($validated['warehouse_id']);
+        \App\Models\Product::findOrFail($validated['product_id']);
 
         $batch->update($validated);
 

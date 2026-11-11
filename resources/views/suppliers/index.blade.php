@@ -39,7 +39,7 @@
                 <tr>
                     <th class="px-6 py-3">اسم المسؤول</th>
                     <th class="px-6 py-3">اسم الشركة</th>
-                    <th class="px-6 py-3">المنظمة</th>
+                    <th class="px-6 py-3">الصيدلية</th>
                     <th class="px-6 py-3">الرصيد (Balance)</th>
                     <th class="px-6 py-3">الحد الائتماني (Credit Limit)</th>
                     <th class="px-6 py-3 text-center">التحكم</th>
@@ -93,9 +93,9 @@
         <form action="{{ route('suppliers.store') }}" method="POST" class="space-y-4">
             @csrf
             <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">المنظمة</label>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">الصيدلية</label>
                 <select name="organization_id" class="w-full rounded-xl border-slate-200 text-sm" required>
-                    <option value="">اختر المنظمة</option>
+                    <option value="">اختر الصيدلية</option>
                     @foreach($organizations as $org)
                         <option value="{{ $org->id }}">{{ $org->name }}</option>
                     @endforeach
@@ -141,9 +141,9 @@
             @method('PUT')
 
             <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">المنظمة</label>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">الصيدلية</label>
                 <select name="organization_id" id="edit_organization_id" class="w-full rounded-xl border-slate-200 text-sm" required>
-                    <option value="">اختر المنظمة</option>
+                    <option value="">اختر الصيدلية</option>
                     @foreach($organizations as $org)
                         <option value="{{ $org->id }}">{{ $org->name }}</option>
                     @endforeach

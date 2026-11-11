@@ -21,6 +21,8 @@
         </div>
     </x-slot>
 
+    @include('partials.flash', ['withSuccess' => true])
+
     <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
         <table class="w-full text-right border-collapse">
             <thead>
@@ -38,11 +40,11 @@
                         <td class="px-6 py-4 text-sm font-semibold text-slate-800">{{ $item->name }}</td>
                         <td class="px-6 py-4 text-sm text-slate-600">{{ $item->category->name ?? 'غير مصنف' }}</td>
                         <td class="px-6 py-4">
-                            <span class="px-2.5 py-1 {{ $item->quantity < 10 ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700' }} rounded-lg text-xs font-bold">
-                                {{ $item->quantity }} وحدة
+                            <span class="px-2.5 py-1 {{ $item->stock_quantity < 10 ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700' }} rounded-lg text-xs font-bold">
+                                {{ $item->stock_quantity }} وحدة
                             </span>
                         </td>
-                        <td class="px-6 py-4 text-sm font-medium text-slate-700">{{ number_format($item->price, 2) }} شيكل</td>
+                        <td class="px-6 py-4 text-sm font-medium text-slate-700">{{ number_format($item->selling_price, 2) }} شيكل</td>
                         <td class="px-6 py-4 text-left">
                             <div class="flex items-center justify-end gap-2">
                                 <!-- ربط زر التعديل -->
@@ -70,4 +72,4 @@
             </tbody>
         </table>
     </div>
-</x-app-layout>
+</x-app-layout>

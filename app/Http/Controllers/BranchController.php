@@ -10,7 +10,7 @@ class BranchController extends Controller
 {
     public function index()
     {
-        $branches = Branch::with('organization')->latest()->get();
+        $branches = Branch::with('organization')->latest()->paginate(25);
         $organizations = Organization::where('status', 'active')->get();
 
         return view('branches.index', compact('branches', 'organizations'));
@@ -18,8 +18,8 @@ class BranchController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate([
-            'organization_id' => 'required|exists:organizations,id',
+        $validated = $request->validate([
+            'organization_id' => 'required|exists:organizations,id,deleted_at,NULL',
             'name'            => 'required|string|max:255',
             'type'            => 'nullable|string|max:100',
             'phone'           => 'nullable|string|max:20',
@@ -27,15 +27,15 @@ class BranchController extends Controller
             'status'          => 'required|in:active,inactive',
         ]);
 
-        Branch::create($request->all());
+        Branch::create($validated);
 
         return redirect()->route('branches.index')->with('success', 'تم إضافة الفرع بنجاح.');
     }
 
     public function update(Request $request, Branch $branch)
     {
-        $request->validate([
-            'organization_id' => 'required|exists:organizations,id',
+        $validated = $request->validate([
+            'organization_id' => 'required|exists:organizations,id,deleted_at,NULL',
             'name'            => 'required|string|max:255',
             'type'            => 'nullable|string|max:100',
             'phone'           => 'nullable|string|max:20',
@@ -43,7 +43,7 @@ class BranchController extends Controller
             'status'          => 'required|in:active,inactive',
         ]);
 
-        $branch->update($request->all());
+        $branch->update($validated);
 
         return redirect()->route('branches.index')->with('success', 'تم تحديث بيانات الفرع بنجاح.');
     }

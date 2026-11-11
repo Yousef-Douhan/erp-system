@@ -15,6 +15,9 @@ class PaymentMethodController extends Controller
 
     public function store(Request $request)
     {
+        // طرق الدفع مشتركة بين كل الصيدليات، فتعديلها لمدير النظام فقط
+        abort_unless(\App\Support\Tenancy::isSuperAdmin(), 403, 'طرق الدفع يديرها مدير النظام فقط.');
+
         $request->validate([
             'name' => 'required|string|max:255',
             'code' => 'required|string|unique:payment_methods,code',
@@ -35,6 +38,9 @@ class PaymentMethodController extends Controller
 
     public function update(Request $request, PaymentMethod $paymentMethod)
     {
+        // طرق الدفع مشتركة بين كل الصيدليات، فتعديلها لمدير النظام فقط
+        abort_unless(\App\Support\Tenancy::isSuperAdmin(), 403, 'طرق الدفع يديرها مدير النظام فقط.');
+
         $request->validate([
             'name' => 'required|string|max:255',
             'code' => 'required|string|unique:payment_methods,code,' . $paymentMethod->id,
@@ -55,6 +61,9 @@ class PaymentMethodController extends Controller
 
     public function destroy(PaymentMethod $paymentMethod)
     {
+        // طرق الدفع مشتركة بين كل الصيدليات، فتعديلها لمدير النظام فقط
+        abort_unless(\App\Support\Tenancy::isSuperAdmin(), 403, 'طرق الدفع يديرها مدير النظام فقط.');
+
         $paymentMethod->delete();
         return redirect()->back()->with('success', 'تم حذف طريقة الدفع بنجاح');
     }

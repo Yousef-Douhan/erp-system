@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
+@include('partials.flash', ['withSuccess' => true])
     <div class="max-w-6xl mx-auto p-4 space-y-4" dir="rtl">
         
         <!-- رأس الصفحة + بطاقة إجمالي ديون كل الزبائن -->
@@ -189,7 +190,7 @@
             let tbody = document.getElementById('ledgerSalesTableBody');
             tbody.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-slate-400">جاري جلب تفاصيل الحركات والسدادات...</td></tr>';
 
-            fetch('/customers/' + id + '/ledger', {
+            fetch("{{ url('customers') }}/" + id + '/ledger', {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
@@ -321,7 +322,7 @@
             let amount = document.getElementById('debtAmount').value;
             let token = document.querySelector('input[name="_token"]').value;
 
-            fetch('/customers/debts/' + currentCustomerId, {
+            fetch("{{ url('customers/debts') }}/" + currentCustomerId, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -347,4 +348,4 @@
             });
         }
     </script>
-@endsection
+@endsection

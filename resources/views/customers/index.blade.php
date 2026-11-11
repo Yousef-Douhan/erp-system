@@ -6,12 +6,14 @@
     <div class="flex items-center justify-between">
         <div>
             <h2 class="text-xl font-extrabold text-slate-800">إدارة العملاء (Customers)</h2>
-            <p class="text-xs text-slate-400 mt-1">متابعة أرصدة العملاء والحدود الائتمانية والمنظمات التابعة لهم</p>
+            <p class="text-xs text-slate-400 mt-1">متابعة أرصدة العملاء والحدود الائتمانية والصيدليات التابعة لهم</p>
         </div>
+        @can('create', \App\Models\Customer::class)
         <button onclick="openModal('addModal')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-md transition-all flex items-center gap-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             إضافة عميل جديد
         </button>
+        @endcan
     </div>
 
     <!-- Alert Success -->
@@ -38,7 +40,7 @@
             <thead class="bg-slate-50 text-slate-500 text-xs font-bold text-right">
                 <tr>
                     <th class="px-6 py-3">اسم العميل</th>
-                    <th class="px-6 py-3">المنظمة</th>
+                    <th class="px-6 py-3">الصيدلية</th>
                     <th class="px-6 py-3">الهاتف</th>
                     <th class="px-6 py-3">الرصيد (Balance)</th>
                     <th class="px-6 py-3">الحد الائتماني (Credit Limit)</th>
@@ -57,14 +59,18 @@
                         <td class="px-6 py-4 font-bold text-indigo-600">{{ number_format($customer->credit_limit, 2) }}</td>
                         <td class="px-6 py-4 text-center flex items-center justify-center gap-2">
                             <!-- زر التعديل -->
+                            @can('update', $customer)
                             <button onclick='openEditModal(@json($customer))' class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold px-2.5 py-1 bg-indigo-50 rounded-lg">تعديل</button>
+                            @endcan
 
                             <!-- زر الحذف -->
+                            @can('delete', $customer)
                             <form action="{{ route('customers.destroy', $customer->id) }}" method="POST" onsubmit="return confirm('هل أنت متأكد من حذف العميل؟');">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="text-rose-600 hover:text-rose-800 text-xs font-semibold px-2.5 py-1 bg-rose-50 rounded-lg">حذف</button>
                             </form>
+                            @endcan
                         </td>
                     </tr>
                 @empty
@@ -93,9 +99,9 @@
         <form action="{{ route('customers.store') }}" method="POST" class="space-y-4">
             @csrf
             <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">المنظمة</label>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">الصيدلية</label>
                 <select name="organization_id" class="w-full rounded-xl border-slate-200 text-sm" required>
-                    <option value="">اختر المنظمة</option>
+                    <option value="">اختر الصيدلية</option>
                     @foreach($organizations as $org)
                         <option value="{{ $org->id }}">{{ $org->name }}</option>
                     @endforeach
@@ -141,9 +147,9 @@
             @method('PUT')
 
             <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">المنظمة</label>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">الصيدلية</label>
                 <select name="organization_id" id="edit_organization_id" class="w-full rounded-xl border-slate-200 text-sm" required>
-                    <option value="">اختر المنظمة</option>
+                    <option value="">اختر الصيدلية</option>
                     @foreach($organizations as $org)
                         <option value="{{ $org->id }}">{{ $org->name }}</option>
                     @endforeach
@@ -162,8 +168,8 @@
 
             <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">الرصيد الحالي (Balance)</label>
-                    <input type="number" step="0.01" name="balance" id="edit_balance" class="w-full rounded-xl border-slate-200 text-sm" min="0" required>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">الرصيد الحالي (يُعدّل من دفتر الديون)</label>
+                    <input type="number" step="0.01" id="edit_balance" class="w-full rounded-xl border-slate-200 text-sm bg-slate-50 text-slate-400" readonly disabled>
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">الحد الائتماني (Credit Limit)</label>
@@ -195,9 +201,9 @@
         document.getElementById('edit_balance').value = customer.balance;
         document.getElementById('edit_credit_limit').value = customer.credit_limit;
 
-        document.getElementById('editForm').action = `/customers/${customer.id}`;
+        document.getElementById('editForm').action = `{{ url('customers') }}/${customer.id}`;
 
         openModal('editModal');
     }
 </script>
-@endsection
+@endsection
