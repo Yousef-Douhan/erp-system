@@ -4,6 +4,7 @@
 
 @section('content')
 <div class="x-page" style="max-width:1100px">
+    @include('partials.subnav', ['set' => 'org'])
     <div class="x-head">
         <div>
             <h2>المستودعات</h2>

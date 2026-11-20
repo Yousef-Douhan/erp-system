@@ -29,6 +29,6 @@ class AccessControlTest extends TestCase
 
     public function test_guest_cannot_create_sale(): void
     {
-        $this->post('/sales', [])->assertRedirect('/login');
+        $this->post('/pos/store', [])->assertRedirect('/login');
     }
 }

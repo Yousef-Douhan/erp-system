@@ -38,6 +38,8 @@ class UserController extends Controller
             'username' => 'required|string|max:255|unique:users',
             'email' => 'required|string|email|max:255|unique:users',
             'phone' => 'nullable|string|max:20',
+            'full_name' => 'nullable|string|max:255',
+            'salary' => 'nullable|numeric|min:0|max:999999',
             'password' => ['required', 'confirmed', $this->passwordRule()],
             'organization_id' => 'nullable|exists:organizations,id,deleted_at,NULL',
             'branch_id' => 'nullable|exists:branches,id,deleted_at,NULL',
@@ -46,6 +48,7 @@ class UserController extends Controller
         ]);
 
         $this->ensureCanAssignRole($request->role);
+        $validated['salary'] = round((float) ($validated['salary'] ?? 0), 2);
         $validated = $this->applyScope($validated, $request->role);
 
         $validated['password'] = Hash::make($request->password);
@@ -57,16 +60,6 @@ class UserController extends Controller
         return redirect()->route('users.index')->with('success', 'تم إضافة المستخدم بنجاح.');
     }
 
-    public function edit(User $user)
-    {
-        $this->authorize('update', $user);
-
-        $organizations = Organization::orderBy('name')->get();
-        $branches = Branch::with('organization:id,name')->orderBy('name')->get();
-        $roles = $this->assignableRoles()->merge(Role::whereIn('name', $user->getRoleNames())->get())->unique('name')->values();
-        return view('users.edit', compact('user', 'organizations', 'branches', 'roles'));
-    }
-
     public function update(Request $request, User $user)
     {
         $this->authorize('update', $user);
@@ -75,6 +68,8 @@ class UserController extends Controller
             'username' => 'required|string|max:255|unique:users,username,' . $user->id,
             'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
             'phone' => 'nullable|string|max:20',
+            'full_name' => 'nullable|string|max:255',
+            'salary' => 'nullable|numeric|min:0|max:999999',
             'password' => ['nullable', 'confirmed', $this->passwordRule()],
             'organization_id' => 'nullable|exists:organizations,id,deleted_at,NULL',
             'branch_id' => 'nullable|exists:branches,id,deleted_at,NULL',
@@ -85,6 +80,7 @@ class UserController extends Controller
         if (!$user->hasRole($request->role)) {
             $this->ensureCanAssignRole($request->role);
         }
+        $validated['salary'] = round((float) ($validated['salary'] ?? 0), 2);
         $validated = $this->applyScope($validated, $request->role);
 
         if ($request->filled('password')) {

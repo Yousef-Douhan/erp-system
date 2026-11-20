@@ -18,8 +18,31 @@ class Purchase extends Model
 
     protected $fillable = [
         'organization_id', 'branch_id', 'supplier_id', 'employee_id',
-        'invoice_number', 'total', 'paid_amount', 'status',
+        'invoice_number', 'total', 'paid_amount', 'returned_amount', 'status',
     ];
+
+    /** الفاتورة لم تُسدَّد بالكامل (بعد خصم المرتجع للمورد) — للاستعمال في whereRaw */
+    public const OPEN_SQL = 'paid_amount < total - COALESCE(returned_amount, 0) - 0.001';
+
+    /** المتبقي علينا في الفاتورة — للاستعمال في selectRaw */
+    public const DUE_SQL = '(total - COALESCE(returned_amount, 0) - paid_amount)';
+
+    /** صافي الفاتورة بعد مرتجعات المورد */
+    public function netTotal(): float
+    {
+        return round(max(0, (float) $this->total - (float) $this->returned_amount), 2);
+    }
+
+    /** المتبقي علينا للمورد على هذه الفاتورة */
+    public function remaining(): float
+    {
+        return round(max(0, $this->netTotal() - (float) $this->paid_amount), 2);
+    }
+
+    public function returns()
+    {
+        return $this->hasMany(PurchaseReturn::class);
+    }
 
     // العلاقة مع عناصر/تفاصيل الفاتورة (Purchase Items)
     public function items()
@@ -47,7 +70,4 @@ class Purchase extends Model
     {
         return $this->hasMany(PurchasePayment::class);
     }
-
-
-  
 }

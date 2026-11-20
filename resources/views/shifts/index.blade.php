@@ -24,7 +24,7 @@
             <div class="x-split" style="padding:0 18px 18px">
                 @include('shifts._summary', ['summary' => $mySummary])
 
-                <form method="POST" action="{{ route('shifts.close', $myShift) }}" class="erp-card x-body is-top" style="display:grid;gap:12px;background:#F7FAF9" id="closeForm">
+                <form method="POST" action="{{ route('shifts.close', $myShift) }}" class="erp-card x-body is-top js-shift-close" style="display:grid;gap:12px;background:#F7FAF9" id="closeForm">
                     @csrf
                     <strong style="font-size:15px">إغلاق الوردية</strong>
                     <div class="x-field">
@@ -32,12 +32,16 @@
                         <input type="number" step="0.01" min="0" name="actual_balance" id="actual" required inputmode="decimal" placeholder="{{ $m($mySummary['expected']) }}" value="{{ old('actual_balance') }}">
                     </div>
                     <div class="x-note" id="diffNote" hidden></div>
+                    <label class="x-check" style="font-size:13px">
+                        <input type="checkbox" name="confirm_cash" value="1"> أؤكد أن المبلغ نقدي موجود في الدرج (حتى لو كان أكثر من المتوقع)
+                    </label>
                     <div class="x-field">
                         <label for="notes">ملاحظات (اختياري)</label>
                         <textarea name="notes" id="notes" maxlength="500" placeholder="مثال: سُلّم المبلغ للمدير">{{ old('notes') }}</textarea>
                     </div>
                     <button class="x-btn">إغلاق الوردية</button>
                 </form>
+                @include('shifts._offline_guard', ['shiftUserId' => $myShift->user_id])
             </div>
         </section>
         <script>

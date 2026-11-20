@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
+<div class="max-w-7xl mx-auto">@include('partials.subnav', ['set' => 'accounts'])</div>
 <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
     <!-- نموذج الإضافة والتعديل -->
     <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 h-fit">
@@ -30,8 +31,8 @@
             </div>
 
             <div>
-                <label class="block text-xs font-bold text-slate-600 mb-1">رقم القيد</label>
-                <input type="text" id="entry_number" name="entry_number" required class="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs font-mono focus:ring-2 focus:ring-indigo-500 outline-none">
+                <label class="block text-xs font-bold text-slate-600 mb-1">رقم القيد <span class="text-slate-400 font-normal">(اتركه فارغاً للترقيم التلقائي)</span></label>
+                <input type="text" id="entry_number" name="entry_number" class="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs font-mono focus:ring-2 focus:ring-indigo-500 outline-none">
             </div>
             
             <div>
@@ -65,68 +66,86 @@
 
     <!-- الجدول -->
     <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-fit">
-        <div class="p-6 border-b border-slate-100 flex justify-between items-center">
-            <h3 class="text-base font-black text-slate-800">قيود اليومية المحاسبية</h3>
-            <span class="text-xs text-slate-400 font-semibold">الإجمالي: {{ $entries->count() }}</span>
+        <div class="p-6 border-b border-slate-100 flex justify-between items-center gap-3 flex-wrap">
+            <div>
+                <h3 class="text-base font-black text-slate-800">قيود اليومية المحاسبية</h3>
+                <p class="text-xs text-slate-400 mt-1">القيود لا تُحذف. القيد الخاطئ يُلغى بـ«قيد عكسي» ثم يُسجَّل الصحيح. قيود النظام (بيع، شراء، مصروف...) لا تُعدَّل من هنا.</p>
+            </div>
+            <span class="text-xs text-slate-400 font-semibold">الإجمالي: {{ $entries->total() }}</span>
         </div>
+        @if (session('success'))
+            <div class="mx-6 mt-4 p-3 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-semibold">{{ session('success') }}</div>
+        @endif
+        @if (session('error'))
+            <div class="mx-6 mt-4 p-3 bg-rose-50 text-rose-600 rounded-xl text-xs font-semibold">{{ session('error') }}</div>
+        @endif
         <table class="w-full text-right border-collapse text-xs">
             <thead>
                 <tr class="bg-slate-50 text-slate-500 border-b border-slate-200">
                     <th class="p-4 font-bold">رقم القيد</th>
                     <th class="p-4 font-bold">التاريخ</th>
                     <th class="p-4 font-bold">البيان</th>
+                    <th class="p-4 font-bold">المصدر</th>
+                    <th class="p-4 font-bold">المبلغ</th>
                     <th class="p-4 font-bold text-center">التحكم</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
                 @forelse($entries as $entry)
-                <tr class="hover:bg-slate-50/50">
+                @php
+                    $payload = [
+                        'id' => $entry->id, 'number' => $entry->entry_number, 'date' => (string) $entry->entry_date,
+                        'desc' => $entry->description, 'org' => $entry->organization->name ?? 'غير محددة', 'org_id' => $entry->organization_id,
+                        'lines' => $entry->lines->map(fn ($l) => ['account' => trim(($l->account->account_code ?? '') . ' ' . ($l->account->name ?? '—')), 'debit' => (float) $l->debit, 'credit' => (float) $l->credit])->values(),
+                    ];
+                    $isReversed = isset($reversed[$entry->id]);
+                @endphp
+                <tr class="hover:bg-slate-50/50 {{ $isReversed ? 'opacity-60' : '' }}">
                     <td class="p-4 font-mono font-bold text-indigo-600">{{ $entry->entry_number }}</td>
                     <td class="p-4 text-slate-600">{{ $entry->entry_date }}</td>
-                    <td class="p-4 text-slate-800 font-medium">{{ $entry->description }}</td>
-                    <td class="p-4 text-center space-x-2 space-x-reverse">
-                        <!-- زر عرض التفاصيل داخل نفس الصفحة -->
-                        <button type="button" onclick="showDetails('{{ $entry->entry_number }}', '{{ $entry->entry_date }}', '{{ $entry->description }}', '{{ $entry->organization->name ?? 'غير محددة' }}')" class="text-emerald-600 hover:underline font-bold">التفاصيل</button>
-                        <button type="button" onclick="editItem('{{ $entry->id }}', '{{ $entry->entry_number }}', '{{ $entry->entry_date }}', '{{ $entry->description }}', '{{ $entry->organization_id }}')" class="text-indigo-600 hover:underline font-bold">تعديل</button>
-                        <form action="{{ route('journal-entries.destroy', $entry->id) }}" method="POST" class="inline-block" onsubmit="return confirm('هل أنت متأكد من الحذف؟')">
-                            @csrf @method('DELETE')
-                            <button type="submit" class="text-rose-600 hover:underline font-bold">حذف</button>
-                        </form>
+                    <td class="p-4 text-slate-800 font-medium">
+                        {{ $entry->description }}
+                        @if ($isReversed)<div class="text-rose-600 font-bold mt-1">معكوس بالقيد {{ $reversed[$entry->id] }}</div>@endif
+                    </td>
+                    <td class="p-4"><span class="px-2 py-0.5 rounded-lg {{ $entry->ref_type ? 'bg-slate-100 text-slate-600' : 'bg-indigo-50 text-indigo-600' }}">{{ $entry->ref_type ? ($sources[$entry->ref_type] ?? $entry->ref_type) : 'يدوي' }}</span></td>
+                    <td class="p-4 font-mono">{{ number_format($entry->lines->sum('debit'), 2) }}</td>
+                    <td class="p-4 text-center whitespace-nowrap">
+                        <button type="button" data-entry='@json($payload)' onclick="showDetails(JSON.parse(this.dataset.entry))" class="text-emerald-600 hover:underline font-bold">التفاصيل</button>
+                        @if (!$entry->ref_type)
+                            <button type="button" data-entry='@json($payload)' onclick="editItem(JSON.parse(this.dataset.entry))" class="text-indigo-600 hover:underline font-bold mr-2">تعديل البيان</button>
+                        @endif
+                        @if (!$isReversed && $entry->ref_type !== 'reversal')
+                            <form action="{{ route('journal-entries.reverse', $entry->id) }}" method="POST" class="inline-block mr-2" onsubmit="return confirm('سيُسجَّل قيد عكسي يلغي أثر هذا القيد، ويبقى الاثنان في السجل. متابعة؟')">
+                                @csrf
+                                <button type="submit" class="text-rose-600 hover:underline font-bold">قيد عكسي</button>
+                            </form>
+                        @endif
                     </td>
                 </tr>
                 @empty
-                <tr><td colspan="4" class="p-6 text-center text-slate-400">لا توجد قيود مسجلة.</td></tr>
+                <tr><td colspan="6" class="p-6 text-center text-slate-400">لا توجد قيود مسجلة.</td></tr>
                 @endforelse
             </tbody>
         </table>
+        <div class="p-4">{{ $entries->links() }}</div>
     </div>
 </div>
 
-<!-- نافذة عرض التفاصيل المنبثقة (Modal) داخل نفس الصفحة -->
+<!-- نافذة عرض التفاصيل -->
 <div id="details-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 space-y-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-xl w-full p-6 space-y-4">
         <div class="flex justify-between items-center border-b pb-3">
-            <h3 class="text-base font-black text-slate-800">تفاصيل القيد المحاسبي</h3>
+            <h3 class="text-base font-black text-slate-800">القيد <span id="modal-number" class="font-mono text-indigo-600"></span></h3>
             <button onclick="closeDetails()" class="text-slate-400 hover:text-slate-600 font-bold text-sm">✕</button>
         </div>
-        <div class="space-y-3 text-xs text-slate-600">
-            <div class="flex justify-between bg-slate-50 p-3 rounded-xl">
-                <span class="font-bold">رقم القيد:</span>
-                <span id="modal-number" class="font-mono font-bold text-indigo-600"></span>
-            </div>
-            <div class="flex justify-between bg-slate-50 p-3 rounded-xl">
-                <span class="font-bold">التاريخ:</span>
-                <span id="modal-date"></span>
-            </div>
-            <div class="flex justify-between bg-slate-50 p-3 rounded-xl">
-                <span class="font-bold">المنظمة:</span>
-                <span id="modal-org"></span>
-            </div>
-            <div class="bg-slate-50 p-3 rounded-xl space-y-1">
-                <span class="font-bold block">البيان / الوصف:</span>
-                <p id="modal-desc" class="text-slate-800 font-medium"></p>
-            </div>
+        <div class="text-xs text-slate-600 space-y-1">
+            <div><b>التاريخ:</b> <span id="modal-date"></span> · <b>الصيدلية:</b> <span id="modal-org"></span></div>
+            <div><b>البيان:</b> <span id="modal-desc" class="text-slate-800"></span></div>
         </div>
+        <table class="w-full text-xs border border-slate-200 rounded-xl overflow-hidden">
+            <thead class="bg-slate-50 text-slate-500"><tr><th class="p-2 text-right">الحساب</th><th class="p-2">مدين</th><th class="p-2">دائن</th></tr></thead>
+            <tbody id="modal-lines" class="divide-y divide-slate-100"></tbody>
+        </table>
         <div class="pt-2 flex justify-end">
             <button onclick="closeDetails()" class="px-5 py-2 bg-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-300 transition">إغلاق</button>
         </div>
@@ -172,12 +191,23 @@
 
     document.addEventListener('DOMContentLoaded', () => { addLine(); addLine(); });
 
-    function showDetails(number, date, desc, orgName) {
-        document.getElementById('modal-number').innerText = number;
-        document.getElementById('modal-date').innerText = date;
-        document.getElementById('modal-desc').innerText = desc;
-        document.getElementById('modal-org').innerText = orgName;
-        
+    function showDetails(e) {
+        document.getElementById('modal-number').innerText = e.number;
+        document.getElementById('modal-date').innerText = e.date;
+        document.getElementById('modal-desc').innerText = e.desc;
+        document.getElementById('modal-org').innerText = e.org;
+        const body = document.getElementById('modal-lines');
+        body.innerHTML = '';
+        e.lines.forEach(l => {
+            const tr = document.createElement('tr');
+            [l.account, l.debit ? l.debit.toFixed(2) : '—', l.credit ? l.credit.toFixed(2) : '—'].forEach((v, i) => {
+                const td = document.createElement('td');
+                td.className = 'p-2 ' + (i ? 'text-center font-mono' : '');
+                td.innerText = v;
+                tr.appendChild(td);
+            });
+            body.appendChild(tr);
+        });
         const modal = document.getElementById('details-modal');
         modal.classList.remove('hidden');
         modal.classList.add('flex');
@@ -189,23 +219,21 @@
         modal.classList.add('hidden');
     }
 
-    function editItem(id, number, date, desc, orgId) {
+    // تعديل البيان والتاريخ فقط (للقيود اليدوية)
+    function editItem(e) {
         const form = document.getElementById('crud-form');
-        form.action = `{{ url('journal-entries') }}/${id}`;
+        form.action = `{{ url('journal-entries') }}/${e.id}`;
         document.getElementById('form-method').value = 'PUT';
-        document.getElementById('entry_number').value = number;
-        document.getElementById('entry_date').value = date;
-        document.getElementById('description').value = desc;
-        
-        const orgSelect = document.querySelector('select[name="organization_id"]');
-        if (orgSelect && orgId) {
-            orgSelect.value = orgId;
-        }
+        document.getElementById('entry_number').value = e.number;
+        document.getElementById('entry_number').disabled = true;
+        document.getElementById('entry_date').value = e.date;
+        document.getElementById('description').value = e.desc;
+        document.querySelector('select[name="organization_id"]').disabled = true;
 
         toggleLines(false);
-        document.getElementById('form-title').innerText = 'تعديل القيد';
+        document.getElementById('form-title').innerText = 'تعديل بيان القيد ' + e.number;
         const btn = document.getElementById('submit-btn');
-        btn.innerText = 'تحديث البيانات';
+        btn.innerText = 'تحديث البيان';
         btn.className = 'w-full py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 shadow-md transition';
         document.getElementById('cancel-btn').classList.remove('hidden');
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -216,6 +244,8 @@
         form.action = "{{ route('journal-entries.store') }}";
         document.getElementById('form-method').value = 'POST';
         form.reset();
+        document.getElementById('entry_number').disabled = false;
+        document.querySelector('select[name="organization_id"]').disabled = false;
         toggleLines(true);
         updateTotals();
         document.getElementById('form-title').innerText = 'إنشاء قيد يومي جديد';
@@ -225,4 +255,4 @@
         document.getElementById('cancel-btn').classList.add('hidden');
     }
 </script>
-@endsection
+@endsection

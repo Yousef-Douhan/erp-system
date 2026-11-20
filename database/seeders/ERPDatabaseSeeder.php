@@ -6,7 +6,6 @@ use Illuminate\Database\Seeder;
 use App\Models\Organization;
 use App\Models\Branch;
 use App\Models\User;
-use App\Models\Employee;
 use App\Models\Customer;
 use App\Models\Category;
 use App\Models\Product;
@@ -45,16 +44,8 @@ class ERPDatabaseSeeder extends Seeder
             'is_active' => true,
         ]);
 
-        // 4. إنشاء الموظف
-        $employee = Employee::create([
-            'organization_id' => $organization->id,
-            'user_id' => $user->id,
-            'branch_id' => $branch->id,
-            'first_name' => 'يوسف',
-            'last_name' => 'دوحان',
-            'salary' => 1200.00,
-            'status' => 'active',
-        ]);
+        // 4. الاسم الكامل والراتب على المستخدم نفسه
+        $user->forceFill(['full_name' => 'يوسف دوحان', 'salary' => 1200.00, 'branch_id' => $branch->id])->save();
 
         // 5. إنشاء العميل
         $customer = Customer::create([

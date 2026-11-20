@@ -42,6 +42,9 @@ class ReportController extends Controller
             ->whereBetween('expense_date', [$from->toDateString(), $to->toDateString()])
             ->sum('amount');
 
+        // الإتلاف (منتهي/تالف) خسارة بسعر التكلفة
+        $disposals = (float) \App\Models\StockDisposal::whereBetween('created_at', [$from, $to])->sum('total_cost');
+
         $revenue = (float) $sales->revenue;
         $gross = round($revenue - $cogs, 2);
         $summary = [
@@ -51,8 +54,9 @@ class ReportController extends Controller
             'cogs'     => round($cogs, 2),
             'gross'    => $gross,
             'margin'   => $revenue > 0 ? round($gross / $revenue * 100, 1) : 0,
-            'expenses' => $expenses,
-            'net'      => round($gross - $expenses, 2),
+            'expenses'  => $expenses,
+            'disposals' => round($disposals, 2),
+            'net'       => round($gross - $expenses - $disposals, 2),
         ];
 
         // ---------- يومياً ----------
@@ -67,15 +71,21 @@ class ReportController extends Controller
             ->selectRaw('DATE(expense_date) as day, SUM(amount) as amount')
             ->groupBy('day')->pluck('amount', 'day');
 
-        $days = collect($dailyRevenue->keys())->merge($dailyExpenses->keys())->unique()->sortDesc()->values();
-        $daily = $days->map(function ($day) use ($dailyRevenue, $dailyCost, $dailyExpenses) {
+        $dailyDisposals = \App\Models\StockDisposal::whereBetween('created_at', [$from, $to])
+            ->selectRaw('DATE(created_at) as day, SUM(total_cost) as cost')
+            ->groupBy('day')->pluck('cost', 'day');
+
+        $days = collect($dailyRevenue->keys())->merge($dailyExpenses->keys())->merge($dailyDisposals->keys())->unique()->sortDesc()->values();
+        $daily = $days->map(function ($day) use ($dailyRevenue, $dailyCost, $dailyExpenses, $dailyDisposals) {
             $rev = (float) ($dailyRevenue[$day]->revenue ?? 0);
             $cost = (float) ($dailyCost[$day] ?? 0);
             $exp = (float) ($dailyExpenses[$day] ?? 0);
+            $disp = (float) ($dailyDisposals[$day] ?? 0);
 
             return [
                 'day' => $day, 'count' => (int) ($dailyRevenue[$day]->cnt ?? 0), 'revenue' => $rev,
-                'cogs' => round($cost, 2), 'gross' => round($rev - $cost, 2), 'expenses' => $exp, 'net' => round($rev - $cost - $exp, 2),
+                'cogs' => round($cost, 2), 'gross' => round($rev - $cost, 2), 'expenses' => $exp, 'disposals' => round($disp, 2),
+                'net' => round($rev - $cost - $exp - $disp, 2),
             ];
         });
 
@@ -103,12 +113,71 @@ class ReportController extends Controller
                     ['الصنف', 'الكمية (وحدة أساسية)', 'الإيراد', 'التكلفة', 'الربح', 'الهامش %'],
                     $byProduct->map(fn ($r) => [$r['name'], $r['qty'], $r['revenue'], $r['cogs'], $r['profit'], $r['margin']]))
                 : $this->csv("profit-daily-{$from->toDateString()}-{$to->toDateString()}.csv",
-                    ['اليوم', 'عدد الفواتير', 'صافي المبيعات', 'التكلفة', 'مجمل الربح', 'المصروفات', 'صافي الربح'],
-                    $daily->map(fn ($r) => [$r['day'], $r['count'], $r['revenue'], $r['cogs'], $r['gross'], $r['expenses'], $r['net']]));
+                    ['اليوم', 'عدد الفواتير', 'صافي المبيعات', 'التكلفة', 'مجمل الربح', 'المصروفات', 'الإتلاف', 'صافي الربح'],
+                    $daily->map(fn ($r) => [$r['day'], $r['count'], $r['revenue'], $r['cogs'], $r['gross'], $r['expenses'], $r['disposals'], $r['net']]));
         }
 
         $tab = 'profit';
         return view('reports.profit', compact('tab', 'from', 'to', 'summary', 'daily', 'byProduct'));
+    }
+
+    /**
+     * تقرير المبيعات: يومي أو شهري (عدد الفواتير، الإجمالي، الخصم، المرتجعات، الصافي، المحصّل، الآجل)
+     * + الأصناف الأكثر مبيعاً بالكمية والقيمة.
+     */
+    public function sales(Request $request)
+    {
+        [$from, $to] = $this->period($request);
+        $user = $request->user();
+        $group = $request->input('group') === 'month' ? 'month' : 'day';
+        $bucket = $group === 'month' ? "DATE_FORMAT(created_at, '%Y-%m')" : 'DATE(created_at)';
+
+        $rows = $this->salesQuery($user, $from, $to)
+            ->selectRaw("{$bucket} as period, COUNT(*) as cnt,
+                SUM(total + COALESCE(discount, 0)) as gross, SUM(COALESCE(discount, 0)) as discount,
+                SUM(COALESCE(returned_amount, 0)) as returned, SUM(total - COALESCE(returned_amount, 0)) as net,
+                SUM(CASE WHEN cash_register_id IS NOT NULL THEN paid_amount ELSE 0 END) as cash,
+                SUM(CASE WHEN cash_register_id IS NULL THEN paid_amount ELSE 0 END) as noncash,
+                SUM(GREATEST(total - COALESCE(returned_amount, 0) - paid_amount, 0)) as credit")
+            ->groupBy('period')->orderByDesc('period')->get()
+            ->map(fn ($r) => [
+                'period' => $r->period, 'count' => (int) $r->cnt, 'gross' => round((float) $r->gross, 2), 'discount' => round((float) $r->discount, 2),
+                'returned' => round((float) $r->returned, 2), 'net' => round((float) $r->net, 2), 'cash' => round((float) $r->cash, 2),
+                'noncash' => round((float) $r->noncash, 2), 'credit' => round((float) $r->credit, 2),
+                'avg' => $r->cnt ? round((float) $r->net / $r->cnt, 2) : 0,
+            ]);
+
+        $sum = fn ($k) => round($rows->sum($k), 2);
+        $summary = [
+            'count' => (int) $rows->sum('count'), 'gross' => $sum('gross'), 'discount' => $sum('discount'), 'returned' => $sum('returned'),
+            'net' => $sum('net'), 'cash' => $sum('cash'), 'noncash' => $sum('noncash'), 'credit' => $sum('credit'),
+        ];
+        $summary['avg'] = $summary['count'] ? round($summary['net'] / $summary['count'], 2) : 0;
+
+        $top = $this->itemsQuery($user, $from, $to)
+            ->groupBy('sale_items.product_id', 'products.name')
+            ->selectRaw('products.name,
+                SUM(' . self::NET_QTY_SQL . ' * COALESCE(sale_items.unit_factor, 1)) as qty,
+                SUM(sale_items.total * ' . self::NET_QTY_SQL . ' / NULLIF(sale_items.quantity, 0)) as revenue,
+                COUNT(DISTINCT sale_items.sale_id) as invoices')
+            ->havingRaw('SUM(' . self::NET_QTY_SQL . ') > 0')
+            ->orderByDesc('qty')
+            ->limit(20)
+            ->get()
+            ->map(fn ($r) => ['name' => $r->name, 'qty' => (float) $r->qty, 'revenue' => round((float) $r->revenue, 2), 'invoices' => (int) $r->invoices]);
+
+        if ($request->input('export') === 'csv') {
+            return $request->input('section') === 'top'
+                ? $this->csv("top-products-{$from->toDateString()}-{$to->toDateString()}.csv",
+                    ['الصنف', 'الكمية (وحدة أساسية)', 'قيمة المبيعات', 'عدد الفواتير'],
+                    $top->map(fn ($r) => [$r['name'], $r['qty'], $r['revenue'], $r['invoices']]))
+                : $this->csv("sales-{$group}-{$from->toDateString()}-{$to->toDateString()}.csv",
+                    [$group === 'month' ? 'الشهر' : 'اليوم', 'الفواتير', 'قبل الخصم', 'الخصم', 'المرتجعات', 'صافي المبيعات', 'نقداً', 'بنك/محفظة', 'آجل', 'متوسط الفاتورة'],
+                    $rows->map(fn ($r) => [$r['period'], $r['count'], $r['gross'], $r['discount'], $r['returned'], $r['net'], $r['cash'], $r['noncash'], $r['credit'], $r['avg']]));
+        }
+
+        $tab = 'sales';
+        return view('reports.sales', compact('tab', 'from', 'to', 'group', 'rows', 'summary', 'top'));
     }
 
     public function employees(Request $request)

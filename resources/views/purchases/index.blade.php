@@ -79,16 +79,12 @@
                         <input type="text" name="invoice_number" value="{{ isset($editPurchase) ? $editPurchase->invoice_number : old('invoice_number') }}" required placeholder="أدخل رقم الفاتورة..." class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-700 focus:ring-2 focus:ring-indigo-500">
                     </div>
 
-                    <!-- إجمالي المبلغ -->
+                    <!-- إجمالي المبلغ: يُحسب من الأصناف، ويُكتب يدوياً فقط لفاتورة بلا أصناف -->
+                    @php $hasItems = isset($editPurchase) && $editPurchase->items()->exists(); @endphp
                     <div class="space-y-1">
-                        <label class="block text-xs font-bold text-slate-700">إجمالي المبلغ</label>
-                        <input type="number" step="0.01" name="total" value="{{ isset($editPurchase) ? $editPurchase->total : old('total', 0) }}" required placeholder="0.00" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-700 focus:ring-2 focus:ring-indigo-500">
-                    </div>
-
-                    <!-- المبلغ المدفوع -->
-                    <div class="space-y-1">
-                        <label class="block text-xs font-bold text-slate-700">المبلغ المدفوع</label>
-                        <input type="number" step="0.01" name="paid_amount" value="{{ isset($editPurchase) ? $editPurchase->paid_amount : old('paid_amount', 0) }}" placeholder="0.00" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-700 focus:ring-2 focus:ring-indigo-500">
+                        <label class="block text-xs font-bold text-slate-700">إجمالي الفاتورة</label>
+                        <input type="number" step="0.01" min="0" name="total" value="{{ isset($editPurchase) ? $editPurchase->total : old('total', 0) }}" placeholder="0.00" @readonly($hasItems) class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-700 focus:ring-2 focus:ring-indigo-500 {{ $hasItems ? 'bg-slate-50' : '' }}">
+                        <p class="text-[11px] text-slate-400">{{ $hasItems ? 'يُحسب تلقائياً من الأصناف.' : 'اتركه صفراً وأضف الأصناف بعد الحفظ، فيُحسب تلقائياً.' }} الدفع للمورد من زر «دفعة للمورد» داخل الفاتورة أو من صفحة سداد الموردين.</p>
                     </div>
 
                     <!-- زر الحفظ -->
@@ -112,7 +108,12 @@
                 <div class="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-6 space-y-4">
                     <div class="flex items-center justify-between border-b border-indigo-100 pb-3">
                         <h3 class="text-sm font-bold text-indigo-900">تفاصيل الفاتورة: {{ $showPurchase->invoice_number }}</h3>
-                        <a href="{{ route('purchases.index') }}" class="text-xs text-indigo-600 hover:underline font-bold">إغلاق التفاصيل</a>
+                        <div style="display:flex;gap:10px;align-items:center">
+                            @if ($showPurchase->items->isNotEmpty() && auth()->user()->can('create_purchases') && Route::has('purchase-returns.create'))
+                                <a href="{{ route('purchase-returns.create', $showPurchase) }}" class="x-btn is-danger is-sm">مرتجع للمورد</a>
+                            @endif
+                            <a href="{{ route('purchases.index') }}" class="text-xs text-indigo-600 hover:underline font-bold">إغلاق التفاصيل</a>
+                        </div>
                     </div>
                     <div class="grid grid-cols-2 gap-4 text-xs text-slate-700">
                         <p><span class="font-bold text-slate-500">المورد:</span> {{ $showPurchase->supplier->name ?? '---' }}</p>
@@ -121,6 +122,10 @@
                         <p><span class="font-bold text-slate-500">الحالة:</span> {{ $showPurchase->status }}</p>
                         <p><span class="font-bold text-slate-500">الإجمالي:</span> <span class="font-bold text-slate-900">{{ number_format($showPurchase->total, 2) }}</span></p>
                         <p><span class="font-bold text-slate-500">المدفوع:</span> <span class="font-bold text-emerald-600">{{ number_format($showPurchase->paid_amount, 2) }}</span></p>
+                        @if ((float) $showPurchase->returned_amount > 0)
+                            <p><span class="font-bold text-slate-500">مرتجع للمورد:</span> <span class="font-bold text-amber-700">− {{ number_format($showPurchase->returned_amount, 2) }}</span></p>
+                            <p><span class="font-bold text-slate-500">صافي الفاتورة:</span> <span class="font-bold text-slate-900">{{ number_format($showPurchase->netTotal(), 2) }}</span></p>
+                        @endif
                     </div>
 
                     <!-- جدول منتجات / عناصر الفاتورة (Purchase Items) -->
@@ -146,17 +151,17 @@
                                             <td class="px-3 py-2 font-semibold">{{ $item->product->name ?? 'منتج غير محدد' }}</td>
                                             <td class="px-3 py-2">{{ $item->batch_number ?? '-' }}</td>
                                             <td class="px-3 py-2">{{ $item->expiry_date ?? '-' }}</td>
-                                            <td class="px-3 py-2">{{ $item->quantity }}</td>
+                                            <td class="px-3 py-2">{{ $item->quantity }}@if ((int) $item->returned_quantity > 0)<div class="text-amber-700">أُرجع {{ (int) $item->returned_quantity }}</div>@endif</td>
                                             <td class="px-3 py-2">{{ number_format($item->unit_cost, 2) }}</td>
                                             <td class="px-3 py-2 font-bold">{{ number_format($item->total, 2) }}</td>
                                             <td class="px-3 py-2 text-center">
-                                                @can('update', $showPurchase)
+                                                @if ((int) $item->returned_quantity === 0 && auth()->user()->can('update', $showPurchase))
                                                 <form action="{{ route('purchase-items.destroy', $item->id) }}" method="POST" onsubmit="return confirm('هل أنت متأكد من حذف هذا المنتج؟')">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="text-rose-600 hover:underline">حذف</button>
                                                 </form>
-                                                @endcan
+                                                @endif
                                             </td>
                                         </tr>
                                     @empty
@@ -194,7 +199,7 @@
                     </div>
 
                     {{-- ================= دفعات المورد ================= --}}
-                    @php $purchaseRemaining = round(max(0, (float) $showPurchase->total - (float) $showPurchase->paid_amount), 2); @endphp
+                    @php $purchaseRemaining = $showPurchase->remaining(); @endphp
                     <div class="mt-4 pt-4 border-t border-indigo-100" style="display:grid;gap:12px">
                         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
                             <h4 class="text-xs font-bold text-slate-800">دفعات المورد على هذه الفاتورة</h4>

@@ -1,165 +1,186 @@
 @extends('layouts.app')
 
+@section('title', 'الدفعات وتواريخ الصلاحية')
+
 @section('content')
-<div class="max-w-7xl mx-auto space-y-6">
-    <!-- Header & Back Button -->
-    <div class="flex items-center justify-between">
+@php
+    $tabs = ['active' => 'المتوفرة', 'expiring' => 'تنتهي خلال 90 يوماً', 'expired' => 'منتهية الصلاحية', 'all' => 'الكل (مع الفارغة)'];
+    $canDispose = Route::has('disposals.store') && auth()->user()->can('stock_count');
+@endphp
+
+<style>
+    .cr-dialog { position: fixed; inset: 0; margin: auto; height: fit-content; max-height: calc(100vh - 32px); overflow: auto; border: 0; border-radius: var(--radius); padding: 0; width: min(440px, calc(100vw - 32px)); box-shadow: 0 20px 50px rgba(16, 42, 43, .25); }
+    .cr-dialog::backdrop { background: rgba(16, 42, 43, .45); }
+    .cr-dialog form { display: grid; gap: 14px; padding: 20px; }
+    .cr-dialog h3 { margin: 0; font-size: 17px; }
+    .cr-dialog .cr-sub { margin: -8px 0 0; color: var(--muted); font-size: 13.5px; }
+    .cr-dialog .x-actions { justify-content: flex-start; }
+</style>
+
+<div class="x-page">
+    <div class="x-head">
         <div>
-            <div class="flex items-center gap-2">
-                <h2 class="text-xl font-extrabold text-slate-800">إدارة جميع الدفعات (Batches)</h2>
-            </div>
-            <p class="text-xs text-slate-400 mt-1">تتبع تواريخ الصلاحية، أرقام التشغيلات، تكاليف الشراء، ومستويات المخزون لجميع المنتجات</p>
+            <h2>الدفعات وتواريخ الصلاحية</h2>
+            <p>للمتابعة فقط: الكميات تدخل بفاتورة شراء وتخرج ببيع أو نقل أو مرتجع للمورد أو إتلاف، وكل حركة تُسجَّل في «حركات المخزون».</p>
         </div>
-        <button onclick="openModal('addBatchModal')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-md shadow-indigo-100 transition-all flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-            إضافة دفعة جديدة
-        </button>
+        <div class="x-actions">
+            @if (Route::has('disposals.index') && auth()->user()->can('stock_count'))
+                <a href="{{ route('disposals.index') }}" class="x-btn is-ghost">سجل الإتلاف</a>
+            @endif
+            @can('create_purchases')
+                <a href="{{ route('purchases.index') }}" class="x-btn">إدخال بضاعة (فاتورة شراء)</a>
+            @endcan
+        </div>
     </div>
 
-    <!-- Alert Success -->
-    @if(session('success'))
-        <div class="p-4 rounded-xl bg-emerald-50 text-emerald-600 text-xs font-semibold border border-emerald-100">
-            {{ session('success') }}
-        </div>
-    @endif
+    @include('partials.x-flash')
 
-    <!-- Errors Validation -->
-    @if($errors->any())
-        <div class="p-4 rounded-xl bg-rose-50 text-rose-600 text-xs font-semibold border border-rose-100">
-            <ul class="list-disc list-inside space-y-1">
-                @foreach($errors->all() as $error)
-                    <li>{{ $error }}</li>
+    <div class="x-stats">
+        <a href="{{ route('batches.index', ['status' => 'expired']) }}" class="x-stat is-bad" style="text-decoration:none">
+            <span>دفعات منتهية فيها كمية</span><strong class="num">{{ $counts['expired'] }}</strong>
+            <em>قيمتها {{ number_format($counts['expired_value'], 2) }} ₪ — لا تُباع، أتلفها أو أرجعها للمورد</em>
+        </a>
+        <a href="{{ route('batches.index', ['status' => 'expiring']) }}" class="x-stat is-warn" style="text-decoration:none">
+            <span>تنتهي خلال 90 يوماً</span><strong class="num">{{ $counts['expiring'] }}</strong><em>بِعها أولاً أو أرجعها للمورد قبل الانتهاء</em>
+        </a>
+    </div>
+
+    <section class="erp-card">
+        <div class="x-body is-top no-print" style="display:grid;gap:12px">
+            <nav class="x-tabs" aria-label="حالة الدفعات">
+                @foreach ($tabs as $key => $label)
+                    <a href="{{ request()->fullUrlWithQuery(['status' => $key, 'page' => null]) }}" class="{{ $status === $key ? 'is-active' : '' }}">{{ $label }}</a>
                 @endforeach
-            </ul>
+            </nav>
+            <form method="GET" class="x-fields">
+                <input type="hidden" name="status" value="{{ $status }}">
+                <div class="x-field"><label for="q">بحث</label><input type="search" id="q" name="q" value="{{ request('q') }}" placeholder="اسم الصنف أو رقم الدفعة"></div>
+                @if ($warehouses->count() > 1)
+                    <div class="x-field">
+                        <label for="wh">المستودع</label>
+                        <select id="wh" name="warehouse_id">
+                            <option value="">كل المستودعات</option>
+                            @foreach ($warehouses as $w)
+                                <option value="{{ $w->id }}" @selected((int) request('warehouse_id') === $w->id)>{{ $w->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
+                <div class="x-actions"><button class="x-btn">عرض</button>@if (request()->hasAny(['q', 'warehouse_id']))<a href="{{ route('batches.index', ['status' => $status]) }}" class="x-btn is-ghost">مسح</a>@endif</div>
+            </form>
         </div>
-    @endif
 
-    <!-- Table of Batches -->
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-slate-200">
-                <thead class="bg-slate-50 text-slate-500 text-xs font-bold text-right">
-                    <tr>
-                        <th class="px-6 py-3">رقم الدفعة</th>
-                        <th class="px-6 py-3">المنتج</th>
-                        <th class="px-6 py-3">المستودع</th>
-                        <th class="px-6 py-3">الكمية</th>
-                        <th class="px-6 py-3">سعر التكلفة</th>
-                        <th class="px-6 py-3">تاريخ الإنتاج</th>
-                        <th class="px-6 py-3">تاريخ الانتهاء</th>
-                        <th class="px-6 py-3 text-center">التحكم</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-200 text-sm text-slate-700">
-                    @forelse($batches as $batch)
-                        <tr>
-                            <td class="px-6 py-4 font-semibold text-slate-900">{{ $batch->batch_number }}</td>
-                            <td class="px-6 py-4">{{ $batch->product->name ?? '---' }}</td>
-                            <td class="px-6 py-4">{{ $batch->warehouse->name ?? '---' }}</td>
-                            <td class="px-6 py-4 font-bold text-indigo-600">{{ $batch->quantity }}</td>
-                            <td class="px-6 py-4">{{ $batch->cost_price }}</td>
-                            <td class="px-6 py-4">{{ $batch->manufacturing_date ?? '---' }}</td>
-                            <td class="px-6 py-4">{{ $batch->expiry_date ?? '---' }}</td>
-                            <td class="px-6 py-4 text-center">
-                                <!-- أزرار الحذف -->
-                                <form action="{{ route('batches.destroy', $batch->id) }}" method="POST" class="inline" onsubmit="return confirm('هل أنت متأكد من حذف هذه الدفعة؟');">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="text-rose-600 hover:text-rose-800 text-xs font-semibold px-2 py-1 bg-rose-50 rounded-lg">حذف</button>
-                                </form>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="8" class="px-6 py-8 text-center text-slate-400 text-sm">
-                                لا توجد أي دفعات مضافة حتى الآن.
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-        
-        <!-- Pagination -->
-        @if($batches->hasPages())
-            <div class="p-4 border-t border-slate-200">
-                {{ $batches->links() }}
+        @if ($batches->isEmpty())
+            <div class="x-empty">لا توجد دفعات في هذا التصنيف.</div>
+        @else
+            <div class="x-table-wrap">
+                <table class="x-table">
+                    <thead>
+                        <tr><th>الصنف</th><th>رقم الدفعة</th><th>المستودع</th><th class="n">الكمية</th><th class="n">التكلفة</th><th>الانتهاء</th><th class="no-print"></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($batches as $batch)
+                            @php
+                                $exp = $batch->expiry_date ? \Illuminate\Support\Carbon::parse($batch->expiry_date) : null;
+                                $days = $exp ? (int) today()->diffInDays($exp, false) : null;
+                                $cost = (float) $batch->cost_price > 0 ? (float) $batch->cost_price : (float) ($batch->product->purchase_price ?? 0);
+                            @endphp
+                            <tr>
+                                <td><strong>{{ $batch->product->name ?? '—' }}</strong></td>
+                                <td class="num">{{ $batch->batch_number }}</td>
+                                <td class="muted">{{ $batch->warehouse->name ?? '—' }}</td>
+                                <td class="n" style="font-weight:700">{{ $batch->quantity }}</td>
+                                <td class="n">{{ number_format($cost, 2) }}</td>
+                                <td>
+                                    @if (!$exp)
+                                        <span class="muted">—</span>
+                                    @else
+                                        <span class="num">{{ $exp->toDateString() }}</span>
+                                        @if ($days < 0)
+                                            <span class="x-badge is-bad">منتهية منذ {{ abs($days) }} يوم</span>
+                                        @elseif ($days <= 90)
+                                            <span class="x-badge is-warn">باقي {{ $days }} يوم</span>
+                                        @endif
+                                    @endif
+                                </td>
+                                <td class="no-print" style="white-space:nowrap">
+                                    <button type="button" class="x-btn is-ghost is-sm js-dates"
+                                            data-url="{{ route('batches.update', $batch) }}" data-label="{{ ($batch->product->name ?? '') . ' — ' . $batch->batch_number }}"
+                                            data-mfg="{{ $batch->manufacturing_date }}" data-exp="{{ $exp?->toDateString() }}">التواريخ</button>
+                                    @if ($canDispose && $batch->quantity > 0)
+                                        <button type="button" class="x-btn is-danger is-sm js-dispose"
+                                                data-url="{{ route('disposals.store', $batch) }}" data-label="{{ ($batch->product->name ?? '') . ' — ' . $batch->batch_number }}"
+                                                data-max="{{ $batch->quantity }}" data-expired="{{ $days !== null && $days < 0 ? 1 : 0 }}">إتلاف</button>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
             </div>
+            <div class="x-pages">{{ $batches->links() }}</div>
         @endif
-    </div>
+    </section>
 </div>
 
-<!-- Modal إضافة دفعة -->
-<div id="addBatchModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 hidden">
-    <div class="bg-white rounded-2xl p-6 w-full max-w-lg space-y-4 shadow-xl">
-        <h3 class="text-lg font-bold text-slate-800">إضافة دفعة جديدة</h3>
-        
-        <form action="{{ route('batches.store') }}" method="POST" class="space-y-4">
-            @csrf
-            
-            <!-- اختيار المنتج -->
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">المنتج</label>
-                <select name="product_id" class="w-full rounded-xl border-slate-200 text-sm" required>
-                    <option value="">اختر المنتج</option>
-                    @foreach($products as $product)
-                        <option value="{{ $product->id }}">{{ $product->name }}</option>
-                    @endforeach
-                </select>
-            </div>
+<dialog class="cr-dialog" id="datesDialog">
+    <form method="POST" id="datesForm">
+        @csrf
+        @method('PUT')
+        <h3>تصحيح تواريخ الدفعة</h3>
+        <p class="cr-sub" id="datesLabel"></p>
+        <div class="x-field"><label for="dMfg">تاريخ الإنتاج</label><input type="date" name="manufacturing_date" id="dMfg"></div>
+        <div class="x-field"><label for="dExp">تاريخ الانتهاء</label><input type="date" name="expiry_date" id="dExp"></div>
+        <div class="x-note">الكمية ورقم الدفعة لا يتغيران من هنا.</div>
+        <div class="x-actions"><button class="x-btn">حفظ</button><button type="button" class="x-btn is-ghost" data-close>إلغاء</button></div>
+    </form>
+</dialog>
 
-            <!-- اختيار المستودع -->
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">المستودع</label>
-                <select name="warehouse_id" class="w-full rounded-xl border-slate-200 text-sm" required>
-                    <option value="">اختر المستودع</option>
-                    @foreach($warehouses as $warehouse)
-                        <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            <!-- رقم الدفعة -->
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">رقم الدفعة (Batch Number)</label>
-                <input type="text" name="batch_number" class="w-full rounded-xl border-slate-200 text-sm" required>
-            </div>
-
-            <!-- تواريخ الإنتاج والانتهاء -->
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">تاريخ الإنتاج</label>
-                    <input type="date" name="manufacturing_date" class="w-full rounded-xl border-slate-200 text-sm">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">تاريخ الانتهاء</label>
-                    <input type="date" name="expiry_date" class="w-full rounded-xl border-slate-200 text-sm">
-                </div>
-            </div>
-
-            <!-- سعر التكلفة والكمية -->
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">سعر التكلفة</label>
-                    <input type="number" step="0.01" name="cost_price" class="w-full rounded-xl border-slate-200 text-sm" required>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">الكمية</label>
-                    <input type="number" name="quantity" class="w-full rounded-xl border-slate-200 text-sm" required>
-                </div>
-            </div>
-
-            <!-- أزرار الإجراءات -->
-            <div class="flex justify-end gap-2 pt-2">
-                <button type="button" onclick="closeModal('addBatchModal')" class="px-4 py-2 bg-slate-100 text-slate-600 text-xs font-semibold rounded-xl">إلغاء</button>
-                <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl">حفظ الدفعة</button>
-            </div>
-        </form>
-    </div>
-</div>
+@if ($canDispose)
+<dialog class="cr-dialog" id="disposeDialog">
+    <form method="POST" id="disposeForm">
+        @csrf
+        <h3>إتلاف من المخزون</h3>
+        <p class="cr-sub" id="disposeLabel"></p>
+        <div class="x-field"><label for="dQty">الكمية</label><input type="number" name="quantity" id="dQty" min="1" step="1" required></div>
+        <div class="x-field">
+            <label for="dReason">السبب</label>
+            <select name="reason" id="dReason">
+                @foreach ($reasons as $key => $label)
+                    <option value="{{ $key }}">{{ $label }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="x-field"><label for="dNotes">ملاحظات (اختياري)</label><input type="text" name="notes" id="dNotes" maxlength="255" placeholder="مثال: كرتونة مبلولة"></div>
+        <div class="x-note">الكمية تخرج من المخزون نهائياً وتُسجَّل كخسارة بسعر التكلفة في تقرير الأرباح. إن كان المورد يقبل إرجاعها فاعمل «مرتجع للمورد» من فاتورة الشراء بدلاً من ذلك.</div>
+        <div class="x-actions"><button class="x-btn is-danger">تأكيد الإتلاف</button><button type="button" class="x-btn is-ghost" data-close>إلغاء</button></div>
+    </form>
+</dialog>
+@endif
 
 <script>
-    function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
-    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+(function () {
+    document.querySelectorAll('.cr-dialog [data-close]').forEach(b => b.addEventListener('click', () => b.closest('dialog').close()));
+
+    const dd = document.getElementById('datesDialog');
+    document.querySelectorAll('.js-dates').forEach(b => b.addEventListener('click', () => {
+        document.getElementById('datesForm').action = b.dataset.url;
+        document.getElementById('datesLabel').textContent = b.dataset.label;
+        document.getElementById('dMfg').value = b.dataset.mfg || '';
+        document.getElementById('dExp').value = b.dataset.exp || '';
+        dd.showModal();
+    }));
+
+    const xd = document.getElementById('disposeDialog');
+    if (!xd) return;
+    document.querySelectorAll('.js-dispose').forEach(b => b.addEventListener('click', () => {
+        document.getElementById('disposeForm').action = b.dataset.url;
+        document.getElementById('disposeLabel').textContent = b.dataset.label + ' — المتوفر ' + b.dataset.max;
+        const q = document.getElementById('dQty');
+        q.max = b.dataset.max; q.value = b.dataset.max;
+        document.getElementById('dReason').value = b.dataset.expired === '1' ? 'expired' : 'damaged';
+        xd.showModal();
+    }));
+})();
 </script>
 @endsection

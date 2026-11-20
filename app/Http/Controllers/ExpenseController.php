@@ -27,8 +27,8 @@ class ExpenseController extends Controller
         $validated = $this->validateExpense($request);
 
         DB::transaction(function () use ($validated) {
-            $this->withdraw($validated['cash_register_id'], (float) $validated['amount']);
             $expense = Expense::create($validated);
+            $this->withdraw($expense);
             $this->postEntry($expense);
         });
 
@@ -42,12 +42,11 @@ class ExpenseController extends Controller
         DB::transaction(function () use ($expense, $validated) {
             // إرجاع المبلغ القديم للخزينة القديمة ثم خصم الجديد
             if ($expense->cash_register_id) {
-                CashRegister::whereKey($expense->cash_register_id)->increment('current_balance', $expense->amount);
+                \App\Services\CashBook::in((int) $expense->cash_register_id, (float) $expense->amount, 'expense_reversal', 'تعديل مصروف #' . $expense->id, 'expense', $expense->id);
             }
 
-            $this->withdraw($validated['cash_register_id'], (float) $validated['amount']);
-
             $expense->update($validated);
+            $this->withdraw($expense);
 
             $this->deleteEntry($expense);
             $this->postEntry($expense);
@@ -60,7 +59,7 @@ class ExpenseController extends Controller
     {
         DB::transaction(function () use ($expense) {
             if ($expense->cash_register_id) {
-                CashRegister::whereKey($expense->cash_register_id)->increment('current_balance', $expense->amount);
+                \App\Services\CashBook::in((int) $expense->cash_register_id, (float) $expense->amount, 'expense_reversal', 'حذف مصروف #' . $expense->id, 'expense', $expense->id);
             }
 
             $this->deleteEntry($expense);
@@ -84,17 +83,17 @@ class ExpenseController extends Controller
     /**
      * خصم المبلغ من الخزينة مع منع الرصيد السالب
      */
-    private function withdraw(int $registerId, float $amount): void
+    private function withdraw(Expense $expense): void
     {
-        $register = CashRegister::whereKey($registerId)->lockForUpdate()->firstOrFail();
-
-        if ((float) $register->current_balance < $amount) {
-            throw ValidationException::withMessages([
-                'amount' => 'رصيد الخزينة (' . number_format($register->current_balance, 2) . ') لا يكفي لهذا المصروف.',
-            ]);
-        }
-
-        $register->decrement('current_balance', $amount);
+        // يرفض تلقائياً إذا لم يكفِ رصيد الخزينة (رسالة على حقل amount)
+        \App\Services\CashBook::out(
+            (int) $expense->cash_register_id,
+            (float) $expense->amount,
+            'expense',
+            $expense->description ?: 'مصروف #' . $expense->id,
+            'expense',
+            $expense->id
+        );
     }
 
     /**

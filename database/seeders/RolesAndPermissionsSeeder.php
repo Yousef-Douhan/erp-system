@@ -79,40 +79,37 @@ class RolesAndPermissionsSeeder extends Seeder
         $adminRole = Role::findOrCreate('Admin', 'web');
         $adminRole->givePermissionTo(Permission::all());
 
-        // دور الصيدلي (Pharmacist)
-        $pharmacistRole = Role::findOrCreate('Pharmacist', 'web');
-        $pharmacistRole->givePermissionTo([
-            'view_dashboard',
-            'view_customers',
-            'create_customers',
-            'view_pharmacy',
-            'create_products',
-            'edit_products',
-            'manage_sales',
-        ]);
+        // أدوار الصيدليات (صاحب صيدلية / مدير فرع / كاشير) تُنشأ في ترحيل multi_pharmacy_branches
+        // ويمكن إنشاء أدوار إضافية من شاشة «الأدوار والصلاحيات».
 
-        // دور المحاسب (Accountant)
-        $accountantRole = Role::findOrCreate('Accountant', 'web');
-        $accountantRole->givePermissionTo([
-            'view_dashboard',
-            'view_purchases',
-            'create_purchases',
-            'view_customers',
-            'manage_accounting',
-        ]);
+        // 4. حساب مدير النظام (يُنشأ مرة واحدة فقط ولا تُغيَّر كلمة سره إن كان موجوداً)
+        // على السيرفر: كلمة السر من ADMIN_PASSWORD في .env، وإلا تُولَّد كلمة عشوائية قوية وتُطبع مرة واحدة.
+        $password = env('ADMIN_PASSWORD');
+        $generated = false;
+        if (!$password) {
+            if (app()->environment('production')) {
+                $password = \Illuminate\Support\Str::password(16, symbols: false);
+                $generated = true;
+            } else {
+                $password = 'password'; // للتطوير المحلي فقط
+            }
+        }
 
-        // 4. إنشاء مستخدم تجريبي وإعطاؤه دور "Admin"
         $adminUser = User::firstOrCreate(
             ['username' => 'youssef'],
             [
-                'organization_id' => 1,
+                'organization_id' => \App\Models\Organization::whereKey(1)->exists() ? 1 : null,
                 'email'           => 'yousefhassandouhan09@gmail.com',
                 'phone'           => '0592157706',
-                'password'        => bcrypt('password'),
+                'password'        => bcrypt($password),
                 'is_active'       => true,
             ]
         );
 
         $adminUser->assignRole($adminRole);
+
+        if ($adminUser->wasRecentlyCreated && $generated && $this->command) {
+            $this->command->warn('تم إنشاء حساب المدير: youssef / ' . $password . '  (احفظها الآن وغيّرها بعد أول دخول)');
+        }
     }
 }

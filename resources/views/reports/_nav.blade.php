@@ -22,6 +22,7 @@
 
 <div class="x-actions no-print" style="justify-content:space-between">
     <nav class="x-tabs" aria-label="التقارير">
+        <a href="{{ route('reports.sales', request()->only(['from', 'to'])) }}" class="{{ $tab === 'sales' ? 'is-active' : '' }}">المبيعات والأكثر مبيعاً</a>
         <a href="{{ route('reports.profit', request()->only(['from', 'to'])) }}" class="{{ $tab === 'profit' ? 'is-active' : '' }}">الأرباح</a>
         <a href="{{ route('reports.employees', request()->only(['from', 'to'])) }}" class="{{ $tab === 'employees' ? 'is-active' : '' }}">مبيعات الموظفين</a>
         <a href="{{ route('reports.slow') }}" class="{{ $tab === 'slow' ? 'is-active' : '' }}">الأصناف الراكدة</a>

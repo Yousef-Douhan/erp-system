@@ -1,5 +1,81 @@
 # دليل تشغيل النظام في الصيدلية
 
+## 0) قبل الرفع على السيرفر (مرة واحدة)
+
+### أ) على جهازك قبل الرفع
+1. شغّل كل الاختبارات على قاعدة `erp_system_testing` ويجب أن تنجح كلها:
+   ```bat
+   php artisan optimize:clear
+   php artisan test
+   ```
+   أهمها: `PagesSmokeTest` (كل صفحة بكل دور)، `SecurityTest`، `DatabaseHealthTest` (الجداول InnoDB).
+2. ارفع آخر نسخة على GitHub: `git add . && git commit -m "..." && git push`.
+3. خذ نسخة احتياطية من قاعدتك المحلية إذا كنت ستنقل بياناتها (من «النسخ الاحتياطية» ← نسخة الآن).
+4. قرر: قاعدة جديدة نظيفة (موصى به) أم نقل القاعدة المحلية؟ القاعدة المحلية فيها 300 صنف تجريبي وفواتير تجريبية.
+
+### ب) متطلبات السيرفر
+- PHP 8.1 أو أحدث مع الإضافات: `pdo_mysql, mbstring, openssl, tokenizer, xml, ctype, json, bcmath, fileinfo, zip, zlib, intl, gd`
+- MySQL 8 أو MariaDB 10.4+ (InnoDB، ترميز `utf8mb4`)
+- Composer 2، و Node.js 18+ (لبناء ملفات الواجهة) أو ابنها على جهازك وارفع `public/build`
+- شهادة HTTPS (مجانية من Let's Encrypt)
+
+### ج) خطوات التنصيب على السيرفر
+```bash
+git clone https://github.com/Yousef-Douhan/erp-system.git
+cd erp-system
+composer install --no-dev --optimize-autoloader
+npm ci && npm run build            # يُنشئ public/build (غير موجود في GitHub)
+cp docs/env.production.example .env   # ثم عدّل القيم المعلّمة <<<
+php artisan key:generate
+php artisan migrate --force
+php artisan db:seed --class=RolesAndPermissionsSeeder --force
+php artisan storage:link
+php artisan config:cache && php artisan route:cache && php artisan view:cache
+chmod -R 775 storage bootstrap/cache   # ومالكها مستخدم السيرفر (www-data مثلاً)
+```
+
+قاعدة البيانات: أنشئها بترميز utf8mb4 ومستخدم خاص بصلاحيات عليها فقط:
+```sql
+CREATE DATABASE erp_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'erp_user'@'localhost' IDENTIFIED BY 'كلمة-سر-قوية';
+GRANT ALL PRIVILEGES ON erp_system.* TO 'erp_user'@'localhost';
+```
+
+### د) أمور أمان لا تُترك
+| البند | لماذا |
+|---|---|
+| جذر الموقع (Document Root) يشير إلى مجلد `public` فقط | وإلا يقدر أي أحد يفتح `.env` ويقرأ كلمة سر القاعدة |
+| `APP_DEBUG=false` | صفحات الخطأ تكشف الكود والإعدادات |
+| `ALLOW_REGISTRATION=false` | لا أحد ينشئ حساباً لنفسه |
+| HTTPS + `SESSION_SECURE_COOKIE=true` | كلمات السر لا تمر نصاً مكشوفاً |
+| غيّر كلمة سر حساب المدير بعد أول دخول | |
+| مستخدم القاعدة ليس `root` | |
+
+### هـ) المهام المجدولة على السيرفر (لينكس)
+`crontab -e` ثم أضف:
+```
+* * * * * cd /path/to/erp-system && php artisan schedule:run >> /dev/null 2>&1
+```
+وانزل نسخة احتياطية خارج السيرفر أسبوعياً على الأقل.
+
+### و) بعد الرفع: فحص يدوي سريع
+1. ادخل كمدير، أنشئ صيدلية وفرعاً وخزينة ومستخدم كاشير.
+2. ادخل كالكاشير: افتح وردية، بيع صنفاً، اطبع الإيصال، اعمل مرتجعاً، أغلق الوردية.
+3. «النسخ الاحتياطية» ← نسخة الآن، وتأكد أن الملف نزل.
+4. افتح رابطاً غير موجود وتأكد أن الصفحة لا تعرض تفاصيل خطأ.
+
+### ز) عند كل تحديث لاحق
+```bash
+php artisan down
+git pull
+composer install --no-dev --optimize-autoloader
+npm ci && npm run build
+php artisan migrate --force
+php artisan optimize:clear && php artisan config:cache && php artisan route:cache && php artisan view:cache
+php artisan up
+```
+
+
 هذا الدليل لتشغيل النظام فعلياً (على جهاز الصيدلية أو سيرفر)، وليس للتطوير.
 
 ## 1) بعد كل تحديث للملفات
@@ -40,7 +116,7 @@ php artisan optimize:clear
 ### صاحب الصيدلية يجهّز صيدليته
 1. «الفروع»: يضيف فروعه (كل فرع يأخذ مستودعاً تلقائياً) والخزائن لكل فرع.
 2. «المستخدمون»: يضيف لكل فرع مدير فرع وكاشيرية (يختار الفرع والدور).
-3. «المنتجات» و«توريد بضاعة»: يدخل الأصناف، والتوريد يدخل مخزون الفرع.
+3. «المنتجات» ثم «فواتير الشراء»: كل بضاعة تدخل عبر فاتورة شراء من مورد، فتزيد مخزون الفرع وما علينا للمورد معاً.
 
 ### إيقاف صيدلية أو فرع
 من شاشة الصيدليات/الفروع اجعل الحالة «غير نشط»: كل مستخدميها يخرجون فوراً ولا يستطيعون الدخول.
@@ -108,7 +184,25 @@ php artisan backup:run
 الاختبارات تعمل على قاعدة منفصلة حتى لا تمسح بياناتك:
 
 1. أنشئ قاعدة فارغة اسمها `erp_system_testing` من phpMyAdmin.
-2. شغّل `php artisan test`.
+2. شغّل `php artisan test` (أو ملفاً واحداً: `php artisan test --filter=SalesFlowTest`).
+
+| الملف | ماذا يفحص |
+|---|---|
+| `PagesSmokeTest` | كل صفحات الموقع: المدير يفتحها كلها، وكل دور ممنوع مما لا يملك صلاحيته، ولا خطأ 500 |
+| `SalesFlowTest` | البيع: المخزون لكل فرع، الخزينة، الآجل، الخصم، الأدوية المراقبة، المنتهية، حذف الفاتورة |
+| `ReturnFlowTest` | المرتجعات: إرجاع المخزون، رد النقد أو تخفيض الدين، أرقام الصفحة الرئيسية |
+| `PurchaseFlowTest` | التوريد يزيد مخزون الفرع، حماية سعر الشراء، دفعات الموردين |
+| `CashFlowTest` | الورديات (عجز/زيادة) والمصروفات |
+| `CashRegisterTest` | دفتر الخزائن: كل حركة مسجلة ومجموعها = الرصيد، الإيداع والسحب والتحويل، منع حذف خزينة فيها رصيد |
+| `SupplierPaymentTest` | سداد الموردين: التوزيع على الفواتير من الأقدم، الخصم من الخزينة، كشف المورد، منع الدفع لمورد صيدلية أخرى |
+| `SupplierLedgerTest` | فواتير الشراء تزيد رصيد المورد وكشفه وقيودها، الدفعات تنقصه، ولا تعديل يدوي للرصيد أو المدفوع |
+| `CleanupRegressionTest` | الجداول المحذوفة غير موجودة، دفتر العميل يُكتب مرة واحدة، الاسم والراتب على المستخدم |
+| `RoutesIntegrityTest` | كل رابط يشير لدالة موجودة، ولا رابط داخلي بدون تسجيل دخول |
+| `StockOperationsTest` | نقل المخزون بين الفروع والجرد |
+| `ReportsTest` | أرقام الربح والتصدير CSV |
+| `SecurityTest` | الدخول والقفل بعد 5 محاولات، الحسابات الموقوفة، فصل الصيدليات والفروع، الصلاحيات |
+| `DatabaseHealthTest` | الجداول InnoDB و utf8mb4 والتراجع عن العمليات يعمل |
+| `TenancyIsolationTest`، `SoftDeleteTest`، `ProductImportTest` | فصل البيانات، الحذف الناعم، استيراد Excel |
 
 ## 7) طريقة العمل اليومية المقترحة
 

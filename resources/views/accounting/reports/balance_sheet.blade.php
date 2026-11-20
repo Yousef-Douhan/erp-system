@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
+<div class="max-w-7xl mx-auto">@include('partials.subnav', ['set' => 'accounts'])</div>
 @php
     $sections = [
         ['title' => 'الأصول', 'items' => $assets, 'total' => $totalAssets, 'head' => 'bg-indigo-50 text-indigo-700', 'debitNature' => true],

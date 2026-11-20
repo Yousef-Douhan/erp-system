@@ -20,12 +20,15 @@ class CustomerTransaction extends Model
     protected $fillable = [
         'customer_id',
         'type',
+        'source',
         'amount',
+        'balance_after',
         'notes',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'balance_after' => 'decimal:2',
     ];
 
     public function customer()

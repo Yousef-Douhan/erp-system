@@ -5,6 +5,7 @@ use App\Models\Purchase;
 use App\Models\Supplier;
 use App\Models\Branch;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PurchaseController extends Controller
 {
@@ -42,27 +43,24 @@ class PurchaseController extends Controller
             'branch_id'      => 'required|exists:branches,id,deleted_at,NULL',
             'supplier_id'    => 'required|exists:suppliers,id,deleted_at,NULL',
             'invoice_number' => ['required', 'string', \Illuminate\Validation\Rule::unique('purchases', 'invoice_number')->where('organization_id', $this->currentOrganizationId())],
-            'total'          => 'required|numeric|min:0',
-            'paid_amount'    => 'nullable|numeric|min:0|lte:total',
+            'total'          => 'nullable|numeric|min:0',
         ]);
 
-        // جلب معرف المنظمة تلقائياً من المستخدم الحالي، أو تعيين القيمة 1 كافتراضي إذا لم تكن موجودة
         $validated['organization_id'] = $this->currentOrganizationId();
         $validated['employee_id'] = auth()->id();
+        $validated['total'] = round((float) ($validated['total'] ?? 0), 2);
+        // المدفوع يُسجَّل فقط عبر «دفعة للمورد» حتى يمر على الخزينة وكشف المورد والقيود
+        $validated['paid_amount'] = 0;
+        $validated['status'] = $validated['total'] > 0 ? 'unpaid' : 'paid';
 
-        $paidAmount = $validated['paid_amount'] ?? 0;
+        $purchase = DB::transaction(function () use ($validated) {
+            $purchase = Purchase::create($validated);
+            \App\Services\SupplierLedger::syncPurchase($purchase, 0);
 
-        if ($paidAmount >= $validated['total']) {
-            $validated['status'] = 'paid';
-        } elseif ($paidAmount > 0) {
-            $validated['status'] = 'partial';
-        } else {
-            $validated['status'] = 'unpaid';
-        }
+            return $purchase;
+        });
 
-        Purchase::create($validated);
-
-        return redirect()->route('purchases.index')->with('success', 'تم إنشاء فاتورة الشراء بنجاح.');
+        return redirect()->route('purchases.index', ['show' => $purchase->id])->with('success', 'تم إنشاء فاتورة الشراء. أضف الأصناف لتدخل المخزون.');
     }
 
     // تحديث فاتورة موجودة (Update)
@@ -74,21 +72,41 @@ class PurchaseController extends Controller
             'branch_id'      => 'required|exists:branches,id,deleted_at,NULL',
             'supplier_id'    => 'required|exists:suppliers,id,deleted_at,NULL',
             'invoice_number' => ['required', 'string', \Illuminate\Validation\Rule::unique('purchases', 'invoice_number')->where('organization_id', $purchase->organization_id)->ignore($purchase->id)],
-            'total'          => 'required|numeric|min:0',
-            'paid_amount'    => 'nullable|numeric|min:0|lte:total',
+            'total'          => 'nullable|numeric|min:0',
         ]);
 
-        $paidAmount = $validated['paid_amount'] ?? 0;
+        $oldTotal = (float) $purchase->total;
+        $oldSupplier = (int) $purchase->supplier_id;
+        $supplierChanged = (int) $validated['supplier_id'] !== $oldSupplier;
 
-        if ($paidAmount >= $validated['total']) {
-            $validated['status'] = 'paid';
-        } elseif ($paidAmount > 0) {
-            $validated['status'] = 'partial';
-        } else {
-            $validated['status'] = 'unpaid';
+        if ($supplierChanged && $purchase->payments()->exists()) {
+            return back()->with('error', 'لا يمكن تغيير مورد فاتورة سُجلت عليها دفعات.');
         }
 
-        $purchase->update($validated);
+        // فاتورة لها أصناف: إجماليها = مجموع الأصناف ولا يُكتب يدوياً
+        $validated['total'] = $purchase->items()->exists()
+            ? (float) $purchase->items()->sum('total')
+            : round((float) ($validated['total'] ?? $oldTotal), 2);
+        $returned = (float) $purchase->returned_amount;
+        $validated['status'] = \App\Services\SaleService::statusFor(max(0, $validated['total'] - $returned), (float) $purchase->paid_amount);
+
+        if ($validated['total'] + 0.001 < (float) $purchase->paid_amount + $returned) {
+            return back()->with('error', 'الإجمالي لا يمكن أن يكون أقل من المدفوع للمورد والمرتجع له (' . number_format((float) $purchase->paid_amount + $returned, 2) . ').');
+        }
+        if ($supplierChanged && $purchase->returns()->exists()) {
+            return back()->with('error', 'لا يمكن تغيير مورد فاتورة عليها مرتجعات.');
+        }
+
+        DB::transaction(function () use ($purchase, $validated, $oldTotal, $oldSupplier, $supplierChanged) {
+            $purchase->update($validated);
+
+            if ($supplierChanged) {
+                \App\Services\SupplierLedger::syncPurchase($purchase, $oldTotal, 0, $oldSupplier);
+                \App\Services\SupplierLedger::syncPurchase($purchase, 0);
+            } else {
+                \App\Services\SupplierLedger::syncPurchase($purchase, $oldTotal);
+            }
+        });
 
         return redirect()->route('purchases.index')->with('success', 'تم تحديث فاتورة الشراء بنجاح.');
     }
@@ -101,7 +119,7 @@ class PurchaseController extends Controller
     {
         $this->authorize('pay', $purchase);
 
-        $remaining = round(max(0, (float) $purchase->total - (float) $purchase->paid_amount), 2);
+        $remaining = $purchase->remaining();
         if ($remaining <= 0) {
             return back()->with('error', 'هذه الفاتورة مسددة بالكامل.');
         }
@@ -117,53 +135,11 @@ class PurchaseController extends Controller
             'cash_register_id.required_if' => 'اختر الخزينة التي سيُصرف منها المبلغ.',
         ]);
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($purchase, $validated, $request) {
-            $purchase = Purchase::whereKey($purchase->id)->lockForUpdate()->firstOrFail();
-            $amount = round((float) $validated['amount'], 2);
-            $isCash = $validated['payment_method'] === 'cash';
-
-            $register = null;
-            if ($isCash) {
-                $register = \App\Services\CashRegisterService::resolve((int) $validated['cash_register_id'], $request->user(), $purchase->branch_id, $amount);
-                $register->decrement('current_balance', $amount);
-            }
-
-            \App\Models\PurchasePayment::create([
-                'purchase_id'      => $purchase->id,
-                'supplier_id'      => $purchase->supplier_id,
-                'cash_register_id' => $register?->id,
-                'user_id'          => $request->user()->id,
-                'amount'           => $amount,
-                'payment_method'   => $validated['payment_method'],
-                'reference'        => $validated['reference'] ?? null,
-                'notes'            => $validated['notes'] ?? null,
-            ]);
-
-            $purchase->paid_amount = round((float) $purchase->paid_amount + $amount, 2);
-            $purchase->status = \App\Services\SaleService::statusFor((float) $purchase->total, (float) $purchase->paid_amount);
-            $purchase->save();
-
-            // كشف حساب المورد (نفس منطق سند الصرف)
-            $supplier = Supplier::whereKey($purchase->supplier_id)->lockForUpdate()->first();
-            if ($supplier) {
-                $supplier->balance = round((float) $supplier->balance - $amount, 2);
-                $supplier->save();
-
-                \App\Models\SupplierAccount::create([
-                    'supplier_id'      => $supplier->id,
-                    'transaction_type' => 'purchase_payment',
-                    'debit'            => $amount,
-                    'credit'           => 0,
-                    'balance'          => $supplier->balance,
-                ]);
-            }
-
-            $orgId = (int) $purchase->organization_id;
-            \App\Services\AccountingService::post($orgId, "دفعة للمورد على فاتورة شراء {$purchase->invoice_number}", [
-                ['account_id' => \App\Services\AccountingService::systemAccount(\App\Services\AccountingService::PAYABLES, $orgId)->id, 'debit' => $amount, 'credit' => 0],
-                ['account_id' => \App\Services\AccountingService::systemAccount($isCash ? \App\Services\AccountingService::CASH : \App\Services\AccountingService::BANK, $orgId)->id, 'debit' => 0, 'credit' => $amount],
-            ], \App\Services\AccountingService::nextEntryNumber('PP'), null, 'purchase_payment', $purchase->id);
-        });
+        // التحقق من رصيد الخزينة والتسجيل في الفاتورة والخزينة وكشف المورد والقيد: كله في الخدمة
+        $register = $validated['payment_method'] === 'cash'
+            ? \App\Services\CashRegisterService::resolve((int) $validated['cash_register_id'], $request->user(), $purchase->branch_id, (float) $validated['amount'])
+            : null;
+        \App\Services\SupplierPaymentService::payInvoice($purchase, (float) $validated['amount'], $validated['payment_method'], $register, $request->user(), $validated['reference'] ?? null, $validated['notes'] ?? null);
 
         return redirect()->route('purchases.index', ['show' => $purchase->id])
             ->with('success', 'تم تسجيل دفعة بقيمة ' . number_format((float) $validated['amount'], 2) . ' ₪ للمورد.');
@@ -177,12 +153,17 @@ class PurchaseController extends Controller
         if ($purchase->payments()->exists()) {
             return back()->with('error', 'لا يمكن حذف فاتورة سُجلت عليها دفعات للمورد.');
         }
+        if ($purchase->returns()->exists()) {
+            return back()->with('error', 'لا يمكن حذف فاتورة عليها مرتجعات للمورد.');
+        }
 
         \Illuminate\Support\Facades\DB::transaction(function () use ($purchase) {
             // سحب كميات الفاتورة من المخزون (يرفض إذا كانت قد بيعت)
             foreach ($purchase->items as $item) {
                 \App\Support\Stock::move((int) $item->product_id, (int) $purchase->branch_id, -(int) $item->quantity, 'purchase_reversed', 'purchase_item', $item->id);
             }
+
+            \App\Services\SupplierLedger::syncPurchase($purchase, (float) $purchase->total, 0);
 
             $purchase->items()->delete();
             $purchase->delete();

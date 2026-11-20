@@ -47,8 +47,25 @@ class CustomerDebtController extends Controller
             if ($request->type === 'add') {
                 CustomerLedger::addDebt($customer, $amount, 'إضافة دين يدوي بقيمة ' . number_format($amount, 2) . ' ₪', 'manual_debt');
             } else {
-                CustomerLedger::recordPayment($customer, $amount, 'سداد دفعة بقيمة ' . number_format($amount, 2) . ' ₪', 'payment');
+                // السداد نقد يدخل الخزينة فعلاً: دفتر العميل + حركة خزينة + قيد (من حـ/ الصندوق إلى حـ/ ذمم العملاء)
+                \Illuminate\Support\Facades\DB::transaction(function () use ($customer, $amount, $request) {
+                    CustomerLedger::recordPayment($customer, $amount, 'سداد دفعة بقيمة ' . number_format($amount, 2) . ' ₪', 'payment');
+
+                    $register = \App\Services\CashRegisterService::resolve($request->integer('cash_register_id') ?: null, $request->user(), $customer->branch_id);
+                    \App\Services\CashBook::in($register, $amount, 'debt_collection', 'سداد دين: ' . $customer->name, 'customer', $customer->id);
+
+                    $orgId = (int) $customer->organization_id;
+                    \App\Services\AccountingService::post($orgId, 'تحصيل دين من ' . $customer->name, [
+                        ['account_id' => \App\Services\AccountingService::systemAccount(\App\Services\AccountingService::CASH, $orgId)->id, 'debit' => $amount, 'credit' => 0],
+                        ['account_id' => \App\Services\AccountingService::systemAccount(\App\Services\AccountingService::RECEIVABLES, $orgId)->id, 'debit' => 0, 'credit' => $amount],
+                    ], \App\Services\AccountingService::nextEntryNumber('CP'), null, 'customer_payment', $customer->id);
+                });
             }
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => collect($e->errors())->flatten()->first(),
+            ], 422);
         } catch (\InvalidArgumentException $e) {
             return response()->json([
                 'success' => false,

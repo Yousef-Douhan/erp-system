@@ -61,57 +61,43 @@
 
     // مجموعات القائمة: [العنوان, الصلاحيات, [[الاسم, الأيقونة, الراوت, نمط التفعيل], ...]]
     $groups = [
-        ['key' => 'sales', 'title' => 'المبيعات', 'can' => ['manage_sales', 'view_customers', 'return_sales', 'manage_shifts'], 'items' => [
-            ['label' => 'الفواتير', 'icon' => 'receipt', 'route' => 'sales.index', 'active' => 'sales.*', 'can' => ['manage_sales']],
+        ['key' => 'sales', 'title' => 'المبيعات', 'can' => ['manage_sales', 'view_customers', 'return_sales', 'manage_shifts', 'view_pharmacy'], 'items' => [
+            ['label' => 'الفواتير', 'icon' => 'receipt', 'route' => 'sales.index', 'active' => ['sales.*', 'returns.create'], 'can' => ['manage_sales']],
+            ['label' => 'المرتجعات', 'icon' => 'undo', 'route' => 'returns.index', 'active' => ['returns.index', 'returns.show'], 'can' => ['return_sales']],
             ['label' => 'العملاء', 'icon' => 'users2', 'route' => 'customers.index', 'active' => 'customers.index', 'can' => ['manage_sales', 'view_customers']],
             ['label' => 'دفتر الديون', 'icon' => 'debt', 'route' => 'debts.index', 'active' => 'debts.*', 'can' => ['manage_sales', 'view_customers']],
-            ['label' => 'المرتجعات', 'icon' => 'undo', 'route' => 'returns.index', 'active' => 'returns.*', 'can' => ['return_sales']],
             ['label' => 'الورديات', 'icon' => 'clock', 'route' => 'shifts.index', 'active' => 'shifts.*', 'can' => ['manage_shifts', 'manage_accounting']],
-        ]],
-        ['key' => 'pharmacy', 'title' => 'الصيدلية والمخزون', 'can' => ['view_pharmacy', 'stock_count', 'transfer_stock', 'print_barcodes'], 'items' => [
-            ['label' => 'المنتجات', 'icon' => 'pill', 'route' => 'products.index', 'active' => 'products.*', 'can' => ['view_pharmacy']],
-            ['label' => 'توريد بضاعة', 'icon' => 'box-in', 'route' => 'inventory.transactions.stock-in', 'active' => 'inventory.transactions.stock-in', 'can' => ['view_pharmacy']],
-            ['label' => 'الدفعات', 'icon' => 'layers', 'route' => 'batches.index', 'active' => 'batches.*', 'can' => ['view_pharmacy']],
-            ['label' => 'الجرد', 'icon' => 'clipboard', 'route' => 'stock-counts.index', 'active' => 'stock-counts.*', 'can' => ['stock_count']],
-            ['label' => 'المستودعات', 'icon' => 'warehouse', 'route' => 'warehouses.index', 'active' => 'warehouses.*', 'can' => ['transfer_stock']],
-            ['label' => 'نقل المخزون', 'icon' => 'arrows', 'route' => 'stock-transfers.index', 'active' => 'stock-transfers.*', 'can' => ['transfer_stock']],
-            ['label' => 'ملصقات الباركود', 'icon' => 'barcode', 'route' => 'barcodes.index', 'active' => 'barcodes.*', 'can' => ['print_barcodes']],
-            ['label' => 'الحركات المخزنية', 'icon' => 'arrows', 'route' => 'inventory-transactions.index', 'active' => ['inventory-transactions.*', 'inventory.transactions.index'], 'can' => ['view_pharmacy']],
             ['label' => 'الوصفات الطبية', 'icon' => 'rx', 'route' => 'prescriptions.index', 'active' => 'prescriptions.*', 'can' => ['view_pharmacy']],
-            ['label' => 'التنبيهات الدوائية', 'icon' => 'alert', 'route' => 'drug-alerts.index', 'active' => 'drug-alerts.*', 'can' => ['view_pharmacy']],
-            ['label' => 'التصنيفات', 'icon' => 'tag', 'route' => 'categories.index', 'active' => 'categories.*', 'can' => ['view_pharmacy']],
-            ['label' => 'الماركات', 'icon' => 'award', 'route' => 'brands.index', 'active' => 'brands.*', 'can' => ['view_pharmacy']],
-            ['label' => 'المصنّعون', 'icon' => 'factory', 'route' => 'manufacturers.index', 'active' => 'manufacturers.*', 'can' => ['view_pharmacy']],
-            ['label' => 'الوحدات', 'icon' => 'scale', 'route' => 'units.index', 'active' => 'units.*', 'can' => ['view_pharmacy']],
-            ['label' => 'حدود المخزون', 'icon' => 'sliders', 'route' => 'stock-settings.index', 'active' => 'stock-settings.*', 'can' => ['view_pharmacy']],
+        ]],
+        ['key' => 'pharmacy', 'title' => 'المخزون', 'can' => ['view_pharmacy', 'stock_count', 'transfer_stock', 'print_barcodes'], 'items' => [
+            ['label' => 'المنتجات', 'icon' => 'pill', 'route' => 'products.index', 'active' => 'products.*', 'can' => ['view_pharmacy']],
+            ['label' => 'الدفعات والصلاحية', 'icon' => 'layers', 'route' => 'batches.index', 'active' => 'batches.*', 'can' => ['view_pharmacy']],
+            ['label' => 'الإتلاف', 'icon' => 'alert', 'route' => 'disposals.index', 'active' => 'disposals.*', 'can' => ['stock_count']],
+            ['label' => 'الجرد', 'icon' => 'clipboard', 'route' => 'stock-counts.index', 'active' => 'stock-counts.*', 'can' => ['stock_count']],
+            ['label' => 'نقل المخزون', 'icon' => 'arrows', 'route' => 'stock-transfers.index', 'active' => 'stock-transfers.*', 'can' => ['transfer_stock']],
+            ['label' => 'الحركات المخزنية', 'icon' => 'history', 'route' => 'inventory-transactions.index', 'active' => 'inventory-transactions.*', 'can' => ['view_pharmacy']],
+            ['label' => 'ملصقات الباركود', 'icon' => 'barcode', 'route' => 'barcodes.index', 'active' => 'barcodes.*', 'can' => ['print_barcodes']],
+            ['label' => 'إعدادات الأصناف', 'icon' => 'tag', 'route' => 'categories.index', 'active' => ['categories.*', 'units.*', 'brands.*', 'drug-alerts.*'], 'can' => ['view_pharmacy']],
         ]],
         ['key' => 'purchases', 'title' => 'المشتريات', 'can' => ['view_purchases'], 'items' => [
-            ['label' => 'فواتير الشراء', 'icon' => 'cart', 'route' => 'purchases.index', 'active' => 'purchases.*'],
+            ['label' => 'فواتير الشراء', 'icon' => 'cart', 'route' => 'purchases.index', 'active' => ['purchases.*', 'purchase-returns.create']],
+            ['label' => 'اقتراح طلبية', 'icon' => 'clipboard', 'route' => 'reorder.index', 'active' => 'reorder.*'],
+            ['label' => 'مرتجعات للموردين', 'icon' => 'undo', 'route' => 'purchase-returns.index', 'active' => ['purchase-returns.index', 'purchase-returns.show']],
             ['label' => 'الموردون', 'icon' => 'truck', 'route' => 'suppliers.index', 'active' => 'suppliers.*'],
+            ['label' => 'سداد الموردين', 'icon' => 'wallet', 'route' => 'supplier-payments.index', 'active' => 'supplier-payments.*', 'can' => ['pay_suppliers']],
+        ]],
+        ['key' => 'accounting', 'title' => 'المالية', 'can' => ['manage_accounting', 'verify_transfers', 'upload_transfer_docs'], 'items' => [
+            ['label' => 'مطابقة الحوالات', 'icon' => 'card', 'route' => 'transfers.index', 'active' => 'transfers.*', 'can' => ['verify_transfers', 'upload_transfer_docs']],
+            ['label' => 'فواتير بدون إنترنت', 'icon' => 'receipt', 'route' => 'offline-sales.index', 'active' => 'offline-sales.*', 'can' => ['manage_accounting']],
+            ['label' => 'الخزائن', 'icon' => 'safe', 'route' => 'cash-registers.index', 'active' => 'cash-registers.*', 'can' => ['manage_accounting']],
+            ['label' => 'المصروفات', 'icon' => 'minus', 'route' => 'expenses.index', 'active' => 'expenses.*', 'can' => ['manage_accounting']],
+            ['label' => 'الحسابات والقيود', 'icon' => 'book', 'route' => 'accounts.index', 'active' => ['accounts.*', 'journal-entries.*', 'reports.income-statement', 'reports.balance-sheet'], 'can' => ['manage_accounting']],
         ]],
         ['key' => 'reports', 'title' => 'التقارير', 'can' => ['view_reports'], 'items' => [
-            ['label' => 'الأرباح', 'icon' => 'trend', 'route' => 'reports.profit', 'active' => 'reports.profit'],
-            ['label' => 'مبيعات الموظفين', 'icon' => 'users2', 'route' => 'reports.employees', 'active' => 'reports.employees'],
-            ['label' => 'الأصناف الراكدة', 'icon' => 'box-in', 'route' => 'reports.slow', 'active' => 'reports.slow'],
+            ['label' => 'التقارير', 'icon' => 'trend', 'route' => 'reports.sales', 'active' => ['reports.sales', 'reports.profit', 'reports.employees', 'reports.slow']],
         ]],
-        ['key' => 'accounting', 'title' => 'المحاسبة', 'can' => ['manage_accounting'], 'items' => [
-            ['label' => 'الخزائن', 'icon' => 'safe', 'route' => 'cash-registers.index', 'active' => 'cash-registers.*'],
-            ['label' => 'المصروفات', 'icon' => 'minus', 'route' => 'expenses.index', 'active' => 'expenses.*'],
-            ['label' => 'دليل الحسابات', 'icon' => 'book', 'route' => 'accounts.index', 'active' => 'accounts.*'],
-            ['label' => 'القيود اليومية', 'icon' => 'journal', 'route' => 'journal-entries.index', 'active' => 'journal-entries.*'],
-            ['label' => 'حسابات العملاء', 'icon' => 'ledger', 'route' => 'customer-accounts.index', 'active' => 'customer-accounts.*'],
-            ['label' => 'حسابات الموردين', 'icon' => 'wallet', 'route' => 'supplier-accounts.index', 'active' => 'supplier-accounts.*'],
-            ['label' => 'قائمة الدخل', 'icon' => 'chart', 'route' => 'reports.income-statement', 'active' => 'reports.income-statement'],
-            ['label' => 'الميزانية العمومية', 'icon' => 'balance', 'route' => 'reports.balance-sheet', 'active' => 'reports.balance-sheet'],
-        ]],
-        ['key' => 'settings', 'title' => 'الصيدلية والفروع', 'can' => ['manage_settings'], 'items' => [
-            ['label' => 'الصيدليات', 'icon' => 'building', 'route' => 'organizations.index', 'active' => 'organizations.*'],
-            ['label' => 'الفروع', 'icon' => 'store', 'route' => 'branches.index', 'active' => 'branches.*'],
-            ['label' => 'الموظفون', 'icon' => 'badge', 'route' => 'employees.index', 'active' => 'employees.*'],
-            ['label' => 'توزيع الموظفين', 'icon' => 'link', 'route' => 'employee-branches.index', 'active' => 'employee-branches.*'],
-            ['label' => 'طرق الدفع', 'icon' => 'card', 'route' => 'payment-methods.index', 'active' => 'payment-methods.*'],
-        ]],
-        ['key' => 'admin', 'title' => 'إدارة النظام', 'can' => ['manage_users', 'manage_roles', 'view_audit_logs', 'manage_backups', 'delete_products', 'delete_customers', 'delete_purchases', 'manage_settings', 'manage_accounting'], 'items' => [
+        ['key' => 'admin', 'title' => 'الإدارة', 'can' => ['manage_settings', 'transfer_stock', 'manage_users', 'manage_roles', 'view_audit_logs', 'manage_backups', 'delete_products', 'delete_customers', 'delete_purchases', 'manage_accounting'], 'items' => [
+            ['label' => 'الصيدلية والفروع', 'icon' => 'store', 'route' => 'branches.index', 'active' => ['organizations.*', 'branches.*', 'warehouses.*', 'payment-methods.*'], 'can' => ['manage_settings']],
             ['label' => 'المستخدمون', 'icon' => 'user', 'route' => 'users.index', 'active' => 'users.*', 'can' => ['manage_users']],
             ['label' => 'الأدوار والصلاحيات', 'icon' => 'shield', 'route' => 'roles.index', 'active' => 'roles.*', 'can' => ['manage_roles']],
             ['label' => 'سجل التدقيق', 'icon' => 'history', 'route' => 'audit-logs.index', 'active' => 'audit-logs.*', 'can' => ['view_audit_logs']],
@@ -154,6 +140,7 @@
 @endphp
 
     <title>{{ $pageTitle }} — {{ config('app.name', 'ERP') }}</title>
+    @include('partials.pwa')
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

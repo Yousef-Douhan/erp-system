@@ -21,8 +21,14 @@ class PurchaseItem extends Model
 
     protected $fillable = [
         'purchase_id', 'product_id', 'batch_number', 'expiry_date',
-        'quantity', 'unit_cost', 'total',
+        'quantity', 'returned_quantity', 'unit_cost', 'total',
     ];
+
+    /** الكمية التي ما زال يمكن إرجاعها للمورد */
+    public function returnableQuantity(): int
+    {
+        return max(0, (int) $this->quantity - (int) $this->returned_quantity);
+    }
 
     // العلاقة مع الفاتورة الأساسية
     public function purchase()

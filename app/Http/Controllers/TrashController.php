@@ -8,8 +8,6 @@ use App\Models\Brand;
 use App\Models\CashRegister;
 use App\Models\Category;
 use App\Models\Customer;
-use App\Models\Employee;
-use App\Models\Manufacturer;
 use App\Models\Organization;
 use App\Models\Product;
 use App\Models\Supplier;
@@ -34,15 +32,13 @@ class TrashController extends Controller
             'products'       => ['model' => Product::class,      'label' => 'الأصناف',       'can' => 'delete_products',  'title' => fn ($m) => $m->name, 'sub' => fn ($m) => $m->barcode],
             'customers'      => ['model' => Customer::class,     'label' => 'العملاء',       'can' => 'delete_customers', 'title' => fn ($m) => $m->name, 'sub' => fn ($m) => $m->phone],
             'suppliers'      => ['model' => Supplier::class,     'label' => 'الموردون',      'can' => 'delete_purchases', 'title' => fn ($m) => $m->name, 'sub' => fn ($m) => $m->phone ?? null],
-            'users'          => ['model' => User::class,         'label' => 'المستخدمون',    'can' => 'manage_users',     'title' => fn ($m) => $m->username, 'sub' => fn ($m) => $m->email],
+            'users'          => ['model' => User::class,         'label' => 'المستخدمون',    'can' => 'manage_users',     'title' => fn ($m) => $m->username . ($m->full_name ? ' — ' . $m->full_name : ''), 'sub' => fn ($m) => $m->email],
             'categories'     => ['model' => Category::class,     'label' => 'التصنيفات',     'can' => 'delete_products',  'title' => fn ($m) => $m->name, 'sub' => null],
             'brands'         => ['model' => Brand::class,        'label' => 'العلامات',      'can' => 'delete_products',  'title' => fn ($m) => $m->name, 'sub' => null],
-            'manufacturers'  => ['model' => Manufacturer::class, 'label' => 'الشركات المصنعة', 'can' => 'delete_products', 'title' => fn ($m) => $m->name, 'sub' => null],
             'units'          => ['model' => Unit::class,         'label' => 'الوحدات',       'can' => 'delete_products',  'title' => fn ($m) => $m->name, 'sub' => null],
             'branches'       => ['model' => Branch::class,       'label' => 'الفروع',        'can' => 'manage_settings',  'title' => fn ($m) => $m->name, 'sub' => fn ($m) => $m->phone],
             'warehouses'     => ['model' => Warehouse::class,    'label' => 'المستودعات',    'can' => 'manage_settings',  'title' => fn ($m) => $m->name, 'sub' => null],
             'cash_registers' => ['model' => CashRegister::class, 'label' => 'الخزائن',       'can' => 'manage_settings',  'title' => fn ($m) => $m->name, 'sub' => null],
-            'employees'      => ['model' => Employee::class,     'label' => 'الموظفون',      'can' => 'manage_settings',  'title' => fn ($m) => trim($m->first_name . ' ' . $m->last_name), 'sub' => null],
             'accounts'       => ['model' => Account::class,      'label' => 'الحسابات',      'can' => 'manage_accounting', 'title' => fn ($m) => $m->name, 'sub' => fn ($m) => $m->code ?? null],
             'organizations'  => ['model' => Organization::class, 'label' => 'الصيدليات',     'can' => null,               'title' => fn ($m) => $m->name, 'sub' => null],
         ];
@@ -88,7 +84,6 @@ class TrashController extends Controller
             ->when($search !== '', function ($q) use ($type, $search) {
                 $col = match ($type) {
                     'users'     => 'username',
-                    'employees' => 'first_name',
                     default     => 'name',
                 };
                 $q->where($col, 'like', "%{$search}%");

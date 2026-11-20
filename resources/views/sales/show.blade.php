@@ -28,12 +28,6 @@
             </a>
             @endif
 
-            @can('update', $sale)
-            <button onclick="openModal('addItemModal')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-md transition-all flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                إضافة منتج للفاتورة
-            </button>
-            @endcan
 
             @can('pay', $sale)
             <button onclick="openModal('payModal')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-md transition-all flex items-center gap-2">
@@ -124,9 +118,13 @@
                         <span class="font-semibold text-slate-500">الوصفة الطبية:</span> د. {{ $sale->prescription->doctor_name }}{{ $sale->prescription->diagnosis ? ' — ' . $sale->prescription->diagnosis : '' }}
                     </div>
                 @endif
-                @if(!empty($sale->wallet_phone))
-                    <div class="text-xs text-slate-600">
-                        <span class="font-semibold text-slate-500">رقم الحساب/المحفظة:</span> <span class="font-mono">{{ $sale->wallet_phone }}</span>
+                @if($sale->payer_name || $sale->wallet_phone || $sale->payer_account || $sale->transfer_ref)
+                    <div class="text-xs text-slate-600 space-y-0.5">
+                        <span class="font-semibold text-slate-500 block">المحوِّل:</span>
+                        @if($sale->payer_name)<div>{{ $sale->payer_name }}</div>@endif
+                        @if($sale->wallet_phone)<div class="font-mono" dir="ltr" style="text-align:right">{{ $sale->wallet_phone }}</div>@endif
+                        @if($sale->payer_account)<div>حساب: <span class="font-mono">{{ $sale->payer_account }}</span></div>@endif
+                        @if($sale->transfer_ref)<div>رقم العملية: <span class="font-mono">{{ $sale->transfer_ref }}</span></div>@endif
                     </div>
                 @endif
             </div>
@@ -147,7 +145,6 @@
                     <th class="px-6 py-3">سعر الوحدة</th>
                     <th class="px-6 py-3">الخصم</th>
                     <th class="px-6 py-3">الإجمالي الصافي</th>
-                    <th class="px-6 py-3 text-center">التحكم</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-200 text-sm text-slate-700">
@@ -165,19 +162,10 @@
                         <td class="px-6 py-4">{{ number_format($item->unit_price, 2) }}</td>
                         <td class="px-6 py-4 text-rose-500">{{ number_format($item->discount, 2) }}</td>
                         <td class="px-6 py-4 font-bold text-slate-900">{{ number_format($item->total, 2) }}</td>
-                        <td class="px-6 py-4 text-center">
-                            @can('update', $sale)
-                            <form action="{{ route('sale-items.destroy', $item->id) }}" method="POST" onsubmit="return confirm('هل أنت متأكد من حذف هذا المنتج من الفاتورة؟');">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="text-rose-600 hover:text-rose-800 text-xs font-semibold px-2.5 py-1 bg-rose-50 rounded-lg">حذف</button>
-                            </form>
-                            @endcan
-                        </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="px-6 py-8 text-center text-slate-400 text-sm">
+                        <td colspan="5" class="px-6 py-8 text-center text-slate-400 text-sm">
                             لا توجد منتجات مضافة لهذه الفاتورة حتى الآن.
                         </td>
                     </tr>
@@ -232,47 +220,6 @@
     @endif
 </div>
 
-<!-- Modal إضافة منتج للفاتورة -->
-<div id="addItemModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 hidden">
-    <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-4 shadow-xl">
-        <h3 class="text-lg font-bold text-slate-800">إضافة منتج إلى الفاتورة</h3>
-        
-        <form action="{{ route('sale-items.store', $sale->id) }}" method="POST" class="space-y-4">
-            @csrf
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">اختر المنتج</label>
-                <select name="product_id" id="product_select" class="w-full rounded-xl border-slate-200 text-sm" required>
-                    <option value="">اختر المنتج...</option>
-                    @foreach($products as $product)
-                        <option value="{{ $product->id }}" data-price="{{ $product->price ?? 0 }}">{{ $product->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">الكمية</label>
-                    <input type="number" step="1" name="quantity" value="1" class="w-full rounded-xl border-slate-200 text-sm" min="1" required>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">سعر الوحدة</label>
-                    <input type="number" step="0.01" name="unit_price" id="unit_price_input" class="w-full rounded-xl border-slate-200 text-sm" min="0" required>
-                </div>
-            </div>
-
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">الخصم (اختياري)</label>
-                <input type="number" step="0.01" name="discount" value="0" class="w-full rounded-xl border-slate-200 text-sm" min="0">
-            </div>
-
-            <div class="flex justify-end gap-2 pt-2">
-                <button type="button" onclick="closeModal('addItemModal')" class="px-4 py-2 bg-slate-100 text-slate-600 text-xs font-semibold rounded-xl">إلغاء</button>
-                <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl">إضافة المنتج</button>
-            </div>
-        </form>
-    </div>
-</div>
-
 <!-- Modal تسجيل دفعة (سداد المتبقي) مع اختيار طريقة الدفع -->
 <div id="payModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 hidden">
     <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-4 shadow-xl">
@@ -286,29 +233,28 @@
                 <input type="number" step="0.01" name="amount" value="{{ \App\Services\SaleService::remaining($sale) }}" max="{{ \App\Services\SaleService::remaining($sale) }}" class="w-full rounded-xl border-slate-200 text-sm" min="0.01" required>
             </div>
 
-            <!-- خيارات الدفع -->
+            <!-- خيارات الدفع (من طرق الدفع المفعّلة) -->
             <div class="space-y-2">
                 <label class="block text-xs font-bold text-slate-700">طريقة الدفع:</label>
                 <div class="grid grid-cols-2 gap-2 text-xs">
-                    <label class="flex items-center gap-2 p-2 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
-                        <input type="radio" name="payment_method" value="cash" checked onchange="togglePayWalletField()"> نقدي (Cash)
-                    </label>
-                    <label class="flex items-center gap-2 p-2 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
-                        <input type="radio" name="payment_method" value="bank_palestine" onchange="togglePayWalletField()"> بنك فلسطين
-                    </label>
-                    <label class="flex items-center gap-2 p-2 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
-                        <input type="radio" name="payment_method" value="palpay" onchange="togglePayWalletField()"> بال بي (PalPay)
-                    </label>
-                    <label class="flex items-center gap-2 p-2 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
-                        <input type="radio" name="payment_method" value="jawwal_pay" onchange="togglePayWalletField()"> جوال بي
-                    </label>
+                    @php $methodsList = $payMethods->isNotEmpty() ? $payMethods : collect([(object) ['code' => 'cash', 'name' => 'نقدي', 'requires_wallet' => false]]); @endphp
+                    @foreach ($methodsList as $pm)
+                        <label class="flex items-center gap-2 p-2 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
+                            <input type="radio" name="payment_method" value="{{ $pm->code }}" data-wallet="{{ $pm->requires_wallet ? 1 : 0 }}" data-kind="{{ $pm->kind ?? ($pm->requires_wallet ? 'wallet' : 'cash') }}" @checked($loop->first) onchange="togglePayWalletField()"> {{ $pm->name }}
+                        </label>
+                    @endforeach
                 </div>
             </div>
 
-            <!-- رقم الحساب/المحفظة عند اختيار طريقة دفع غير نقدية -->
-            <div id="payWalletField" class="hidden">
-                <label class="block text-xs font-semibold text-slate-600 mb-1">رقم الحساب / المحفظة / مرجع التحويل</label>
-                <input type="text" name="wallet_phone" class="w-full rounded-xl border-slate-200 text-xs" placeholder="أدخل رقم الحساب أو الجوال...">
+            <!-- بيانات المحوِّل عند الدفع ببنك/محفظة: للمطابقة مع كشف الحساب -->
+            <div id="payWalletField" class="hidden space-y-2 p-3 rounded-xl border border-dashed border-slate-300 bg-slate-50">
+                <p class="text-xs font-bold text-slate-700">بيانات المحوِّل (للمطابقة مع كشف الحساب)</p>
+                <input type="text" name="payer_name" id="payPayerName" maxlength="120" value="{{ old('payer_name', $sale->customer->name ?? '') }}" class="w-full rounded-xl border-slate-200 text-xs" placeholder="اسم المحوِّل كما يظهر في الحوالة">
+                <input type="text" name="wallet_phone" id="payWalletPhone" maxlength="30" dir="ltr" value="{{ old('wallet_phone') }}" class="w-full rounded-xl border-slate-200 text-xs text-right" placeholder="رقم الجوال / المحفظة 059xxxxxxx">
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="text" name="payer_account" maxlength="60" dir="ltr" value="{{ old('payer_account') }}" class="w-full rounded-xl border-slate-200 text-xs text-right" placeholder="رقم الحساب (اختياري)">
+                    <input type="text" name="transfer_ref" maxlength="60" dir="ltr" value="{{ old('transfer_ref') }}" class="w-full rounded-xl border-slate-200 text-xs text-right" placeholder="رقم العملية (اختياري)">
+                </div>
             </div>
 
             <div class="flex justify-end gap-2 pt-2">
@@ -323,24 +269,19 @@
     function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
     function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
-    // تعبئة سعر الوحدة تلقائياً عند اختيار المنتج
-    document.getElementById('product_select').addEventListener('change', function() {
-        let selectedOption = this.options[this.selectedIndex];
-        let price = selectedOption.getAttribute('data-price');
-        if(price) {
-            document.getElementById('unit_price_input').value = price;
-        }
-    });
-
     // إظهار أو إخفاء حقل رقم المحفظة في نافذة تسديد الدفعة
     function togglePayWalletField() {
-        let method = document.querySelector('input[name="payment_method"]:checked').value;
-        let walletField = document.getElementById('payWalletField');
-        if (method === 'cash') {
-            walletField.classList.add('hidden');
-        } else {
-            walletField.classList.remove('hidden');
-        }
+        const checked = document.querySelector('input[name="payment_method"]:checked');
+        const wallet = checked && checked.dataset.wallet === '1';
+        const field = document.getElementById('payWalletField');
+        field.classList.toggle('hidden', !wallet);
+        const bank = checked && checked.dataset.kind === 'bank';
+        const name = document.getElementById('payPayerName'), phone = document.getElementById('payWalletPhone');
+        name.required = wallet;
+        name.placeholder = bank ? 'اسم صاحب الحساب البنكي (إجباري)' : 'اسم المحوِّل كما يظهر في المحفظة (إجباري)';
+        phone.required = wallet && !bank;
+        phone.placeholder = bank ? 'رقم الجوال (اختياري)' : 'رقم الجوال / المحفظة 059xxxxxxx (إجباري)';
     }
+    document.addEventListener('DOMContentLoaded', togglePayWalletField);
 </script>
 @endsection

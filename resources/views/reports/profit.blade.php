@@ -17,7 +17,10 @@
         <div class="x-stat"><span>تكلفة البضاعة المباعة</span><strong class="num">{{ $m($summary['cogs']) }}<small>₪</small></strong></div>
         <div class="x-stat {{ $summary['gross'] >= 0 ? 'is-good' : 'is-bad' }}"><span>مجمل الربح</span><strong class="num">{{ $m($summary['gross']) }}<small>₪</small></strong><em>هامش {{ $summary['margin'] }}%</em></div>
         <div class="x-stat"><span>المصروفات</span><strong class="num">{{ $m($summary['expenses']) }}<small>₪</small></strong></div>
-        <div class="x-stat is-main"><span>صافي الربح</span><strong class="num">{{ $m($summary['net']) }}<small>₪</small></strong><em>بعد المصروفات</em></div>
+        @if ($summary['disposals'] > 0)
+            <div class="x-stat is-bad"><span>خسائر الإتلاف</span><strong class="num">{{ $m($summary['disposals']) }}<small>₪</small></strong><em>منتهي الصلاحية / تالف</em></div>
+        @endif
+        <div class="x-stat is-main"><span>صافي الربح</span><strong class="num">{{ $m($summary['net']) }}<small>₪</small></strong><em>بعد المصروفات{{ $summary['disposals'] > 0 ? ' والإتلاف' : '' }}</em></div>
     </div>
 
     <section class="erp-card">
@@ -30,7 +33,7 @@
         @else
             <div class="x-table-wrap">
                 <table class="x-table">
-                    <thead><tr><th>اليوم</th><th class="n">الفواتير</th><th class="n">صافي المبيعات</th><th class="n">التكلفة</th><th class="n">مجمل الربح</th><th class="n">المصروفات</th><th class="n">صافي الربح</th></tr></thead>
+                    <thead><tr><th>اليوم</th><th class="n">الفواتير</th><th class="n">صافي المبيعات</th><th class="n">التكلفة</th><th class="n">مجمل الربح</th><th class="n">المصروفات</th>@if ($summary['disposals'] > 0)<th class="n">الإتلاف</th>@endif<th class="n">صافي الربح</th></tr></thead>
                     <tbody>
                         @foreach ($daily as $d)
                             <tr>
@@ -40,6 +43,7 @@
                                 <td class="n">{{ $m($d['cogs']) }}</td>
                                 <td class="n" style="color:{{ $d['gross'] >= 0 ? 'var(--green)' : 'var(--red)' }}">{{ $m($d['gross']) }}</td>
                                 <td class="n">{{ $m($d['expenses']) }}</td>
+                                @if ($summary['disposals'] > 0)<td class="n">{{ $m($d['disposals']) }}</td>@endif
                                 <td class="n" style="font-weight:700;color:{{ $d['net'] >= 0 ? 'var(--ink)' : 'var(--red)' }}">{{ $m($d['net']) }}</td>
                             </tr>
                         @endforeach
@@ -47,7 +51,7 @@
                     <tfoot>
                         <tr>
                             <td>الإجمالي</td><td class="n">{{ $summary['count'] }}</td><td class="n">{{ $m($summary['revenue']) }}</td><td class="n">{{ $m($summary['cogs']) }}</td>
-                            <td class="n">{{ $m($summary['gross']) }}</td><td class="n">{{ $m($summary['expenses']) }}</td><td class="n">{{ $m($summary['net']) }}</td>
+                            <td class="n">{{ $m($summary['gross']) }}</td><td class="n">{{ $m($summary['expenses']) }}</td>@if ($summary['disposals'] > 0)<td class="n">{{ $m($summary['disposals']) }}</td>@endif<td class="n">{{ $m($summary['net']) }}</td>
                         </tr>
                     </tfoot>
                 </table>

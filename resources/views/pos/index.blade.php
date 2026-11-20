@@ -70,6 +70,7 @@
         'name'   => $m->name,
         'icon'   => $m->icon,
         'wallet' => (bool) $m->requires_wallet,
+        'kind'   => $m->kind ?: ($m->requires_wallet ? 'wallet' : 'cash'),   // cash | bank | wallet
     ])->values();
 
     if ($methodsData->isEmpty()) {
@@ -290,6 +291,12 @@
         font: inherit; font-size: 18px; font-weight: 700; text-align: center;
     }
     .pos-wallet input { font-size: 15px; font-weight: 500; }
+    .pos-wallet-group { display: grid; gap: 8px; padding: 10px; border: 1px dashed var(--teal-line, #BFDCD8); border-radius: 12px; background: #F7FBFA; }
+    .pos-wallet-group[hidden] { display: none; }
+    .pos-wallet-group .pos-wallet-title { font-size: 12.5px; font-weight: 700; color: var(--teal); }
+    .pos-wallet-group input { height: 36px; text-align: right; }
+    .pos-wallet-group input.num { direction: ltr; text-align: right; }
+    .pos-wallet-group .opt { font-weight: 400; color: var(--muted); font-size: 11.5px; }
     .pos-paid input:focus, .pos-wallet input:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 4px var(--teal-soft); }
     .pos-quick { display: flex; gap: 6px; }
     .pos-quick [hidden] { display: none; }
@@ -372,6 +379,45 @@
     .pos-modal-actions button { height: 40px; padding: 0 18px; border-radius: 10px; font: 600 14px 'IBM Plex Sans Arabic', sans-serif; border: 1.5px solid #D8E1DF; background: #fff; cursor: pointer; }
     .pos-modal-actions button[type="submit"] { background: #0F5C5A; border-color: #0F5C5A; color: #fff; }
 
+    /* ---------- البيع بدون إنترنت ---------- */
+    .pos-net { cursor: pointer; font-family: inherit; }
+    .pos-net .pos-net-dot { width: 9px; height: 9px; border-radius: 50%; background: #1F8A5B; box-shadow: 0 0 0 3px #E3F4EC; }
+    .pos-net[data-tone="off"] { border-color: #E9B4AE; color: #B42318; background: #FCEBE9; }
+    .pos-net[data-tone="off"] .pos-net-dot { background: #B42318; box-shadow: 0 0 0 3px #F8D3CF; }
+    .pos-net[data-tone="bad"] { border-color: #E9B4AE; color: #B42318; }
+    .pos-net[data-tone="bad"] .pos-net-dot { background: #B42318; box-shadow: 0 0 0 3px #F8D3CF; }
+    .pos-net[data-tone="wait"] .pos-net-dot { background: #9A5A06; box-shadow: 0 0 0 3px #FCF1DF; }
+    .pos-net-count { min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; background: #9A5A06; color: #fff; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }
+    .pos-net[data-tone="off"] .pos-net-count, .pos-net[data-tone="bad"] .pos-net-count { background: #B42318; }
+    .pos-net span { display: inline !important; }
+
+    .pos-queue { position: fixed; inset: 0; z-index: 95; display: none; align-items: flex-start; justify-content: center; background: rgba(16,42,43,.45); padding: 40px 16px; overflow-y: auto; }
+    .pos-queue.open { display: flex; }
+    .pos-queue-card { width: 100%; max-width: 640px; background: #fff; border-radius: 14px; padding: 18px; font-family: 'IBM Plex Sans Arabic', sans-serif; color: #102A2B; }
+    .pos-queue-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .pos-queue-head h3 { margin: 0; font-size: 16px; }
+    .pos-queue-close, .pos-queue-btn { height: 36px; padding: 0 14px; border-radius: 9px; font: 600 13px 'IBM Plex Sans Arabic', sans-serif; border: 1.5px solid #D8E1DF; background: #fff; color: #102A2B; cursor: pointer; white-space: nowrap; }
+    .pos-queue-btn { background: #0F5C5A; border-color: #0F5C5A; color: #fff; }
+    .pos-queue-btn:disabled { opacity: .5; cursor: default; }
+    .pos-queue-btn.is-ghost { background: #fff; color: #0F5C5A; border-color: #D8E1DF; }
+    .pos-queue-btn.is-danger { background: #fff; color: #B42318; border-color: #E9B4AE; }
+    .pos-queue-btn.is-armed { background: #B42318; color: #fff; border-color: #B42318; }
+    .pos-queue-status { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 10px; background: #E3F4EC; color: #14643F; font-weight: 600; font-size: 14px; margin-bottom: 10px; }
+    .pos-queue-status[data-tone="off"] { background: #FCEBE9; color: #B42318; }
+    .pos-queue-msg { font-size: 13px; padding: 8px 12px; border-radius: 9px; background: #EEF2F1; margin-bottom: 8px; line-height: 1.6; }
+    .pos-queue-msg.is-bad { background: #FCEBE9; color: #B42318; }
+    .pos-queue-empty { padding: 28px 8px; text-align: center; color: #5C6E6C; }
+    .pos-queue-list { display: grid; gap: 8px; }
+    .pos-queue-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; padding: 10px 12px; border: 1px solid #D8E1DF; border-radius: 10px; font-size: 14px; }
+    .pos-queue-sub { font-size: 12.5px; color: #5C6E6C; margin-top: 3px; }
+    .pos-queue-sub.is-bad { color: #B42318; } .pos-queue-sub.is-warn { color: #9A5A06; }
+    .pos-queue-tag { align-self: start; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 7px; background: #FCF1DF; color: #9A5A06; white-space: nowrap; }
+    .pos-queue-tag[data-tone="ok"] { background: #E3F4EC; color: #14643F; }
+    .pos-queue-tag[data-tone="bad"] { background: #FCEBE9; color: #B42318; }
+    .pos-queue-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+    .pos-offline-note { display: none; }
+    .pos.is-offline .pos-offline-note { display: block; font-size: 12.5px; font-weight: 600; color: #B42318; background: #FCEBE9; border-radius: 9px; padding: 7px 10px; margin-top: 8px; }
+
     @media (max-width: 1100px) {
         .pos { grid-template-columns: 1fr; height: auto; }
         .pos-catalog { height: 70vh; }
@@ -393,7 +439,16 @@
     }
 </style>
 
-<div class="pos {{ (session('success') || $errors->any()) ? 'has-banner' : '' }}" id="pos">
+<div class="pos {{ (session('success') || $errors->any() || !empty($shiftBlocked)) ? 'has-banner' : '' }}" id="pos" @if (session('success') || $errors->any()) data-pos-flash="1" @endif>
+
+    @if (!empty($shiftBlocked) && !$errors->any())
+        <div class="pos-banner err" role="alert">
+            <span>لا يمكن البيع قبل فتح وردية على خزينة. هذا إعداد الصيدلية.</span>
+            @if (Route::has('shifts.index'))
+                <a href="{{ route('shifts.index') }}">فتح وردية الآن</a>
+            @endif
+        </div>
+    @endif
 
     @if (session('success'))
         <div class="pos-banner ok" role="status">
@@ -423,6 +478,9 @@
                 <input type="text" id="posSearch" autocomplete="off" placeholder="ابحث بالاسم أو امسح الباركود" autofocus>
                 <span class="pos-kbd">F2</span>
             </label>
+            <button type="button" class="pos-tool pos-net" id="posNet" data-tone="wait" aria-haspopup="dialog" title="حالة الاتصال والفواتير المحفوظة على الجهاز">
+                <span class="pos-net-dot" aria-hidden="true"></span><span>جارٍ الفحص</span>
+            </button>
             <a href="{{ route('debts.index') }}" class="pos-tool is-debt" title="دفتر الديون">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                 <span>الديون</span>
@@ -526,9 +584,24 @@
                         <select id="posRegisterSelect" name="cash_register_id"></select>
                     </div>
 
-                    <div class="pos-inline pos-wallet" id="posWallet" hidden>
-                        <label for="posWalletInput">رقم المحفظة</label>
-                        <input type="text" name="wallet_phone" id="posWalletInput" class="num" inputmode="tel" placeholder="059xxxxxxx">
+                    <div class="pos-wallet-group" id="posWallet" hidden>
+                        <div class="pos-wallet-title" id="posWalletTitle">بيانات المحوِّل — للمطابقة مع كشف الحساب</div>
+                        <div class="pos-inline pos-wallet">
+                            <label for="posPayerName" id="posPayerNameLabel">اسم المحوِّل</label>
+                            <input type="text" name="payer_name" id="posPayerName" maxlength="120" autocomplete="off" placeholder="كما يظهر في الحوالة">
+                        </div>
+                        <div class="pos-inline pos-wallet">
+                            <label for="posWalletInput" id="posWalletLabel">رقم الجوال / المحفظة</label>
+                            <input type="text" name="wallet_phone" id="posWalletInput" class="num" inputmode="tel" maxlength="30" autocomplete="off" placeholder="059xxxxxxx">
+                        </div>
+                        <div class="pos-inline pos-wallet">
+                            <label for="posPayerAccount">رقم الحساب <span class="opt">(اختياري)</span></label>
+                            <input type="text" name="payer_account" id="posPayerAccount" class="num" maxlength="60" autocomplete="off" placeholder="IBAN أو رقم الحساب">
+                        </div>
+                        <div class="pos-inline pos-wallet">
+                            <label for="posTransferRef">رقم العملية <span class="opt">(اختياري)</span></label>
+                            <input type="text" name="transfer_ref" id="posTransferRef" class="num" maxlength="60" autocomplete="off" placeholder="من رسالة التحويل">
+                        </div>
                     </div>
 
                     <div class="pos-inline pos-paid">
@@ -546,6 +619,7 @@
 
                     <div class="pos-balance" id="posBalance"><span>الباقي للزبون</span><span class="num">0.00</span></div>
                     <div class="pos-hint" id="posHint" hidden></div>
+                    <div class="pos-offline-note" role="status">لا يوجد إنترنت: الفاتورة ستُحفظ على الجهاز برقم مؤقت وتُرفع تلقائياً لما يرجع النت.</div>
 
                     <button type="submit" class="pos-complete" id="posComplete" disabled>
                         إتمام البيع <kbd>Enter</kbd>
@@ -572,12 +646,34 @@
     </form>
 </div>
 
+<script src="{{ asset('js/pos-offline.js') }}?v={{ @filemtime(public_path('js/pos-offline.js')) }}"></script>
 <script>
 const POS = (() => {
     const products = @json($productsData);
     const customers = @json($customersData);
     const methods = @json($methodsData);
     const registers = @json($registersData);
+    const OFFLINE = {{ \Illuminate\Support\Js::from([
+        'userId'      => auth()->id(),
+        'userName'    => auth()->user()->name ?? auth()->user()->username,
+        'branchId'    => $posBranchId ?? null,
+        'storeName'   => auth()->user()->organization->name ?? config('app.name'),
+        'renderedAt'  => now()->toIso8601String(),
+        'pingUrl'     => route('pos.ping'),
+        'syncUrl'     => route('pos.sync'),
+        'pageUrl'     => route('pos.index'),
+        'shiftBlocked'=> !empty($shiftBlocked),
+    ]) }};
+
+    // الفواتير المحفوظة على الجهاز ولم تصل السيرفر: تُطرح من المخزون وتُضاف لديون العملاء المعروضة
+    if (window.PosOffline) {
+        const d = PosOffline.deductions(OFFLINE.renderedAt);
+        products.forEach(p => { if (d.stock[p.id]) p.stock = Math.max(0, p.stock - d.stock[p.id]); });
+        customers.forEach(c => {
+            if (d.debt[c.id]) c.balance = Math.round((c.balance + d.debt[c.id]) * 100) / 100;
+            c.prescriptions = c.prescriptions.filter(r => !d.rx.has(String(r.id)));
+        });
+    }
     const productById = new Map(products.map(p => [String(p.id), p]));
     const customerById = new Map(customers.map(c => [String(c.id), c]));
     const STORAGE_KEY = 'pos_draft_v3';
@@ -835,6 +931,11 @@ const POS = (() => {
         ).join('');
         const method = methods.find(m => m.code === state.method);
         $('posWallet').hidden = !(method && method.wallet);
+        // البنك: اسم صاحب الحساب إجباري والجوال اختياري. المحفظة: الاسم والجوال إجباريان
+        const isBank = method && method.kind === 'bank';
+        $('posWalletTitle').textContent = isBank ? 'بيانات الحساب المحوِّل — للمطابقة مع كشف البنك' : 'بيانات المحوِّل — للمطابقة مع كشف المحفظة';
+        $('posPayerNameLabel').textContent = isBank ? 'اسم صاحب الحساب' : 'اسم المحوِّل';
+        $('posWalletLabel').innerHTML = isBank ? 'رقم الجوال <span class="opt">(اختياري)</span>' : 'رقم الجوال / المحفظة';
         $('posMethodInput').value = state.method;
 
         // الخزينة: تظهر للطرق النقدية فقط، والاختيار مطلوب فقط إذا كان هناك أكثر من خزينة
@@ -864,6 +965,10 @@ const POS = (() => {
         let t = totals();
         if (!state.paidTouched) { state.paid = t.total; t = totals(); }
         $('posPaid').value = state.paidTouched ? $('posPaid').value : money(t.total);
+
+        // اسم المحوِّل: يُقترح اسم العميل المختار ما لم يكتب الكاشير اسماً آخر
+        const payer = $('posPayerName');
+        if (!payer.dataset.touched) payer.value = t.customer ? t.customer.name : '';
 
         $('posSubtotal').textContent = money(t.subtotal);
         $('posTotal').innerHTML = `${money(t.total)}<span>₪</span>`;
@@ -911,8 +1016,10 @@ const POS = (() => {
         let hint = '', hintError = false;
         if (!t.customer && t.due > 0 && state.cart.length) {
             hint = 'البيع بالدين يحتاج إلى عميل مسجل. اختر العميل أو ادفع المبلغ كاملاً.'; hintError = true;
-        } else if (method && method.wallet && !$('posWalletInput').value.trim() && state.cart.length) {
-            hint = 'أدخل رقم المحفظة أو الحساب لإتمام الدفع بهذه الطريقة.'; hintError = true;
+        } else if (method && method.wallet && state.cart.length && !$('posPayerName').value.trim()) {
+            hint = method.kind === 'bank' ? 'أدخل اسم صاحب الحساب البنكي المحوِّل (كما يظهر في كشف البنك).' : 'أدخل اسم المحوِّل كما يظهر في المحفظة.'; hintError = true;
+        } else if (method && method.kind === 'wallet' && state.cart.length && !$('posWalletInput').value.trim()) {
+            hint = 'أدخل رقم جوال/محفظة المحوِّل لإتمام الدفع بهذه الطريقة.'; hintError = true;
         } else if (t.customer && t.customer.limit > 0 && t.customer.balance + t.due > t.customer.limit) {
             hint = `تنبيه: دين العميل سيصبح ${money(t.customer.balance + t.due)} ₪ وهو أعلى من حده الائتماني.`;
         } else if (isCashMethod(method) && !registers.length && t.paid > 0 && state.cart.length) {
@@ -984,7 +1091,116 @@ const POS = (() => {
         renderHidden();
         $('posComplete').disabled = true; $('posDebt').disabled = true;
         $('posComplete').textContent = 'جارٍ الحفظ…';
-        $('posForm').submit();
+        finish();
+    }
+
+    // ---------- الحفظ: مع النت على السيرفر، وبدونه على الجهاز ----------
+    let finishing = false;
+    async function finish() {
+        if (finishing) return;
+        if (!window.PosOffline) { $('posForm').submit(); return; }
+        finishing = true;
+        try {
+            let net = await PosOffline.reachable();
+            if (net === 'online' && PosOffline.counts().pending) {
+                // الفواتير القديمة أولاً حتى يبقى الترتيب صحيحاً
+                await Promise.race([PosOffline.sync(), new Promise(r => setTimeout(r, 8000))]);
+            }
+            if (net === 'online') { $('posForm').submit(); return; }
+            if (OFFLINE.shiftBlocked) { toast('لا يمكن البيع قبل فتح وردية.', true); restoreButtons(); return; }
+            queueSale();
+        } catch (e) {
+            restoreButtons();
+            toast('تعذّر حفظ الفاتورة، حاول مرة أخرى.', true);
+        } finally {
+            finishing = false;
+        }
+    }
+
+    function restoreButtons() {
+        $('posComplete').innerHTML = 'إتمام البيع <kbd>Enter</kbd>';
+        $('posRegisterSelect').disabled = false;
+        $('posMethodInput').value = state.method;
+        renderSummary();
+    }
+
+    function queueSale() {
+        const t = totals();
+        const code = $('posMethodInput').value || state.method;
+        const method = methods.find(m => m.code === code);
+        const isCash = code !== 'debt' && isCashMethod(method);
+        const paid = code === 'debt' ? 0 : Math.max(0, Number($('posPaid').value) || 0);
+        const due = Math.max(0, Math.round((t.total - paid) * 100) / 100);
+        const extra = Math.max(0, paid - t.total);
+        const toOldDebt = t.customer ? Math.min(extra, t.customer.balance) : 0;
+        const val = id => ($(id).value || '').trim();
+
+        const prices = {}, lines = [];
+        state.cart.forEach(l => {
+            const p = productById.get(l.pid), u = unitOf(p, l.uid);
+            prices[`${p.id}:${l.uid || 0}`] = u.price;
+            lines.push({ pid: p.id, uid: l.uid || 0, qty: l.qty, base_qty: Math.round(l.qty * u.factor), name: p.name, unit: u.name, price: u.price });
+        });
+
+        const entry = PosOffline.enqueue({
+            customer_id: t.customer ? t.customer.id : null,
+            customer_name: t.customer ? t.customer.name : '',
+            total: t.total, discount: t.discount, paid, due,
+            change: Math.max(0, extra - toOldDebt),
+            debt_delta: Math.round((due - toOldDebt) * 100) / 100,
+            method_name: code === 'debt' ? 'آجل' : (method ? method.name : code),
+            lines,
+            payload: {
+                customer_id: t.customer ? t.customer.id : null,
+                prescription_id: state.prescriptionId || null,
+                items: state.cart.map(l => ({ product_id: Number(l.pid), product_unit_id: l.uid || null, quantity: l.qty })),
+                prices,
+                payment_method: code,
+                paid_amount: paid,
+                discount: t.discount,
+                wallet_phone: isCash ? null : val('posWalletInput') || null,
+                payer_name: isCash ? null : val('posPayerName') || null,
+                payer_account: isCash ? null : val('posPayerAccount') || null,
+                transfer_ref: isCash ? null : val('posTransferRef') || null,
+            },
+        });
+        if (!entry) { restoreButtons(); toast('ذاكرة الجهاز ممتلئة، تعذّر حفظ الفاتورة.', true); return; }
+
+        // تحديث المعروض محلياً: المخزون، دين العميل، الوصفة المصروفة
+        lines.forEach(l => { const p = productById.get(String(l.pid)); if (p) p.stock = Math.max(0, p.stock - l.base_qty); });
+        if (t.customer) {
+            t.customer.balance = Math.round((t.customer.balance + entry.debt_delta) * 100) / 100;
+            if (state.prescriptionId) t.customer.prescriptions = t.customer.prescriptions.filter(r => String(r.id) !== String(state.prescriptionId));
+        }
+
+        resetSale();
+        closeSheet();
+        showOfflineBanner(entry);
+    }
+
+    function resetSale() {
+        state.cart = []; state.discount = 0; state.paid = 0; state.paidTouched = false; state.prescriptionId = '';
+        state.method = methods[0].code;
+        $('posDiscount').value = 0;
+        ['posPayerName', 'posWalletInput', 'posPayerAccount', 'posTransferRef'].forEach(id => { $(id).value = ''; delete $(id).dataset.touched; });
+        try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+        restoreButtons();
+        render();
+        $('posSearch').focus();
+    }
+
+    function showOfflineBanner(entry) {
+        document.querySelectorAll('.pos-banner.is-offline-sale').forEach(b => b.remove());
+        const b = document.createElement('div');
+        b.className = 'pos-banner ok is-offline-sale';
+        b.setAttribute('role', 'status');
+        b.innerHTML = `<span>حُفظت الفاتورة على الجهاز برقم مؤقت <b class="num">${esc(entry.number)}</b> وستُرفع لما يرجع النت.</span>` +
+            `<a href="#" data-print>طباعة الإيصال</a>`;
+        b.querySelector('[data-print]').addEventListener('click', e => { e.preventDefault(); PosOffline.printReceipt(entry); });
+        const pos = $('pos');
+        pos.querySelectorAll(':scope > .pos-banner').forEach(x => x.remove());
+        pos.classList.add('has-banner');
+        pos.prepend(b);
     }
 
     function openSheet() {
@@ -1048,6 +1264,7 @@ const POS = (() => {
             if (m && m.wallet) $('posWalletInput').focus();
         });
         $('posWalletInput').addEventListener('input', renderSummary);
+        $('posPayerName').addEventListener('input', e => { e.target.dataset.touched = e.target.value ? '1' : ''; renderSummary(); });
         $('posRegisterSelect').addEventListener('change', e => { state.registerId = e.target.value; saveDraft(); });
         $('posRxSelect').addEventListener('change', e => { state.prescriptionId = e.target.value; renderSummary(); saveDraft(); });
 
@@ -1081,6 +1298,14 @@ const POS = (() => {
         $('posClear').addEventListener('click', clearSale);
 
         $('posModal').addEventListener('click', e => { if (e.target === $('posModal')) closeModal(); });
+
+        // إضافة عميل تحتاج السيرفر
+        $('posCustomerForm').addEventListener('submit', async e => {
+            if (!window.PosOffline || e.target.dataset.checked) return;
+            e.preventDefault();
+            if (await PosOffline.reachable() === 'online') { e.target.dataset.checked = '1'; e.target.submit(); }
+            else toast('إضافة عميل جديد تحتاج إنترنت. سجّل البيع كزبون نقدي أو لعميل موجود.', true);
+        });
 
         // اختصارات لوحة المفاتيح + التقاط الماسح الضوئي عندما لا يكون التركيز في حقل
         let buffer = '', lastKey = 0;
@@ -1128,6 +1353,11 @@ const POS = (() => {
     }
 
     function init() {
+        if (window.PosOffline) {
+            PosOffline.init(Object.assign({}, OFFLINE, {
+                onChange: s => { $('pos').classList.toggle('is-offline', s.net === 'offline' || s.net === 'auth'); },
+            }));
+        }
         loadDraft();
         $('posDiscount').value = state.discount;
         bind();

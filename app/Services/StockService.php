@@ -48,14 +48,17 @@ class StockService
 
     /**
      * صرف كمية (بالوحدة الأساسية) لعنصر فاتورة. يرجع رقم أول دفعة صُرف منها.
+     *
+     * $allowShortage: لفواتير البيع بدون إنترنت فقط — البضاعة خرجت فعلاً من الصيدلية،
+     * فيُصرف المتاح من الدفعات والباقي بدون دفعة (يصير رصيد الفرع سالباً وتُعلَّم الفاتورة للمراجعة).
      */
-    public static function issueForSaleItem(SaleItem $item, int $baseQty): ?int
+    public static function issueForSaleItem(SaleItem $item, int $baseQty, bool $allowShortage = false): ?int
     {
-        $product = Product::whereKey($item->product_id)->lockForUpdate()->firstOrFail();
+        $product = Product::withTrashed()->whereKey($item->product_id)->lockForUpdate()->firstOrFail();
         $branchId = self::branchOfItem($item);
 
         $available = self::sellableQuantity($product, $branchId);
-        if ($available < $baseQty) {
+        if ($available < $baseQty && !$allowShortage) {
             throw \Illuminate\Validation\ValidationException::withMessages([
                 'items' => "الكمية المطلوبة من ({$product->name}) أكبر من المتوفر في الفرع ({$available}).",
             ]);

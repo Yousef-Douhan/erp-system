@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
+<div class="max-w-7xl mx-auto">@include('partials.subnav', ['set' => 'org'])</div>
 <div class="max-w-6xl mx-auto space-y-6 p-4">
     <div class="flex justify-between items-center bg-white p-4 rounded-xl border shadow-sm">
         <h2 class="text-lg font-bold text-slate-800">إدارة طرق الدفع</h2>
@@ -16,7 +17,7 @@
                     <th class="p-3">الكود البرمجي</th>
                     <th class="p-3">الأيقونة</th>
                     <th class="p-3">اللون</th>
-                    <th class="p-3">تتطلب محفظة؟</th>
+                    <th class="p-3">النوع</th>
                     <th class="p-3">الحالة</th>
                     <th class="p-3 text-center">الإجراءات</th>
                 </tr>
@@ -28,7 +29,25 @@
                     <td class="p-3 text-slate-500 font-mono">{{ $method->code }}</td>
                     <td class="p-3 text-lg">{{ $method->icon }}</td>
                     <td class="p-3"><span class="px-2 py-1 bg-{{ $method->color }}-100 text-{{ $method->color }}-700 rounded font-bold">{{ $method->color }}</span></td>
-                    <td class="p-3">{{ $method->requires_wallet ? 'نعم' : 'لا' }}</td>
+                    <td class="p-3">
+                        @if (\App\Support\Tenancy::isSuperAdmin())
+                            <form action="{{ route('payment-methods.update', $method->id) }}" method="POST">
+                                @csrf @method('PUT')
+                                <input type="hidden" name="name" value="{{ $method->name }}">
+                                <input type="hidden" name="code" value="{{ $method->code }}">
+                                <input type="hidden" name="icon" value="{{ $method->icon }}">
+                                <input type="hidden" name="color" value="{{ $method->color ?: 'emerald' }}">
+                                @if ($method->is_active)<input type="hidden" name="is_active" value="1">@endif
+                                <select name="kind" onchange="this.form.submit()" class="rounded-lg border-slate-200 text-xs" aria-label="نوع {{ $method->name }}">
+                                    @foreach (\App\Models\PaymentMethod::KINDS as $k => $label)
+                                        <option value="{{ $k }}" @selected(($method->kind ?: ($method->requires_wallet ? 'wallet' : 'cash')) === $k)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </form>
+                        @else
+                            {{ \App\Models\PaymentMethod::KINDS[$method->kind ?? 'cash'] ?? $method->kind }}
+                        @endif
+                    </td>
                     <td class="p-3">
                         <span class="px-2 py-1 rounded text-white text-[10px] {{ $method->is_active ? 'bg-emerald-600' : 'bg-rose-500' }}">
                             {{ $method->is_active ? 'نشط' : 'معطل' }}
@@ -77,11 +96,13 @@
                     </select>
                 </div>
             </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">النوع</label>
+                <select name="kind" class="w-full rounded-lg border-slate-200 text-xs" required>
+                    @foreach (\App\Models\PaymentMethod::KINDS as $k => $label)<option value="{{ $k }}">{{ $label }}</option>@endforeach
+                </select>
+            </div>
             <div class="flex items-center gap-4 pt-2">
-                <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-700 cursor-pointer">
-                    <input type="checkbox" name="requires_wallet" value="1" class="rounded border-slate-300 text-emerald-600">
-                    تتطلب رقم محفظة/حساب؟
-                </label>
                 <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-700 cursor-pointer">
                     <input type="checkbox" name="is_active" value="1" checked class="rounded border-slate-300 text-emerald-600">
                     نشط وتظهر في نقطة البيع

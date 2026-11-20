@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0F5C5A">
+    <title>لا يوجد اتصال</title>
+    <style>
+        :root { --ink: #102A2B; --teal: #0F5C5A; --muted: #5C6E6C; --canvas: #EEF2F1; --paper: #fff; --line: #D8E1DF; }
+        @media (prefers-color-scheme: dark) { :root { --ink: #E6EFEE; --muted: #9DB1AF; --canvas: #0E1A1B; --paper: #152526; --line: #26393A; --teal: #5FB7AE; } }
+        * { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px; background: var(--canvas); color: var(--ink);
+               font-family: 'IBM Plex Sans Arabic', Tahoma, system-ui, sans-serif; }
+        .card { width: 100%; max-width: 440px; background: var(--paper); border: 1px solid var(--line); border-radius: 16px; padding: 28px 24px; text-align: center; }
+        .icon { width: 56px; height: 56px; margin: 0 auto 14px; border-radius: 14px; background: var(--teal); display: grid; place-items: center; }
+        h1 { font-size: 20px; margin: 0 0 8px; }
+        p { color: var(--muted); line-height: 1.8; margin: 0 0 20px; font-size: 15px; }
+        .actions { display: grid; gap: 10px; }
+        a, button { height: 46px; border-radius: 11px; font-family: inherit; font-size: 15px; font-weight: 600; display: flex; align-items: center; justify-content: center; text-decoration: none; cursor: pointer; }
+        a.main { background: var(--teal); color: #fff; border: 0; }
+        button { background: transparent; color: var(--ink); border: 1.5px solid var(--line); }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <div class="icon" aria-hidden="true">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M2 8.8a15 15 0 0 1 20 0M5 12.6a10 10 0 0 1 14 0M8.5 16.4a5 5 0 0 1 7 0M12 20h.01M3 3l18 18"/></svg>
+        </div>
+        <h1>لا يوجد اتصال بالإنترنت</h1>
+        <p>هذه الصفحة تحتاج اتصالاً بالسيرفر. نقطة البيع تعمل بدون إنترنت، والفواتير تُحفظ على الجهاز وتُرفع لما يرجع النت.</p>
+        <div class="actions">
+            <a class="main" href="./pos">افتح نقطة البيع</a>
+            <button type="button" onclick="location.reload()">أعد المحاولة</button>
+        </div>
+    </main>
+</body>
+</html>

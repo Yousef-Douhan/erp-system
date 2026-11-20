@@ -2,49 +2,28 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Supplier;
 use App\Models\SupplierAccount;
-use App\Models\Supplier; // استدعاء مودل الموردين
-use Illuminate\Http\Request;
 
+/**
+ * كشف حساب المورد: فواتير الشراء (له) والدفعات (منه) والرصيد بعد كل حركة.
+ */
 class SupplierAccountController extends Controller
 {
-    public function index()
+    public function show(Supplier $supplier)
     {
-        $supplierAccounts = SupplierAccount::with('supplier')->latest()->paginate(15);
-        $suppliers = Supplier::all(); // جلب قائمة الموردين لعرضها في القائمة المنسدلة
-        return view('supplier_accounts.index', compact('supplierAccounts', 'suppliers'));
-    }
+        $statement = SupplierAccount::where('supplier_id', $supplier->id)
+            ->orderByDesc('created_at')->orderByDesc('id')
+            ->paginate(40);
 
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'supplier_id' => 'required|exists:suppliers,id,deleted_at,NULL',
-            'transaction_type' => 'required|string',
-            'debit' => 'required|numeric|min:0',
-            'credit' => 'required|numeric|min:0',
-        ]);
+        $totals = SupplierAccount::where('supplier_id', $supplier->id)
+            ->selectRaw("COALESCE(SUM(credit), 0) AS invoices,
+                COALESCE(SUM(CASE WHEN transaction_type = 'purchase_return' THEN 0 ELSE debit END), 0) AS payments,
+                COALESCE(SUM(CASE WHEN transaction_type = 'purchase_return' THEN debit ELSE 0 END), 0) AS returns")
+            ->first();
 
-        // رصيد المورد = المبلغ المستحق له علينا: الدائن يزيده (مشتريات) والمدين ينقصه (دفعات)
-        \Illuminate\Support\Facades\DB::transaction(function () use (&$validated) {
-            $supplier = Supplier::whereKey($validated['supplier_id'])->lockForUpdate()->firstOrFail();
-            $supplier->balance = round((float) $supplier->balance + (float) $validated['credit'] - (float) $validated['debit'], 2);
-            $supplier->save();
+        $openInvoices = \App\Services\SupplierPaymentService::openInvoices($supplier);
 
-            $validated['balance'] = $supplier->balance;
-            SupplierAccount::create($validated);
-        });
-
-        return back()->with('success', 'تم تسجيل المعاملة المالية للمورد بنجاح.');
-    }
-
-    public function show(SupplierAccount $supplierAccount)
-    {
-        $supplierAccount->load('supplier');
-        $statement = SupplierAccount::where('supplier_id', $supplierAccount->supplier_id)
-            ->orderBy('created_at')
-            ->orderBy('id')
-            ->paginate(25);
-
-        return view('supplier_accounts.show', compact('supplierAccount', 'statement'));
+        return view('supplier_accounts.show', compact('supplier', 'statement', 'totals', 'openInvoices'));
     }
 }

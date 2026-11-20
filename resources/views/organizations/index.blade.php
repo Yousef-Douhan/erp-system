@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
+<div class="max-w-7xl mx-auto">@include('partials.subnav', ['set' => 'org'])</div>
 <div class="max-w-7xl mx-auto">
     <!-- رأس الصفحة مع زر الإضافة -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -118,6 +119,11 @@
                                             <option value="inactive" {{ $org->status == 'inactive' ? 'selected' : '' }}>غير نشط</option>
                                         </select>
                                     </div>
+                                    <label class="flex items-start gap-2 text-xs text-slate-700 cursor-pointer">
+                                        <input type="hidden" name="require_shift" value="0">
+                                        <input type="checkbox" name="require_shift" value="1" class="mt-0.5 rounded border-slate-300" {{ $org->require_shift ? 'checked' : '' }}>
+                                        <span><b>إلزام فتح وردية قبل البيع</b><br><span class="text-slate-500">لا يستطيع الموظف البيع من نقطة البيع إلا إذا فتح وردية على خزينة، فيُحاسَب كل كاشير على صندوقه.</span></span>
+                                    </label>
                                 </div>
                                 <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
                                     <button type="button" onclick="closeModal('editModal{{ $org->id }}')" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-semibold">إلغاء</button>

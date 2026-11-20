@@ -44,7 +44,9 @@ class OrganizationController extends Controller
             'currency' => 'required|string|max:10',
             'timezone' => 'required|string|max:50',
             'status' => 'required|in:active,inactive',
+            'require_shift' => 'nullable|boolean',
         ]);
+        $validated['require_shift'] = $request->boolean('require_shift');
 
         $organization->update($validated);
 

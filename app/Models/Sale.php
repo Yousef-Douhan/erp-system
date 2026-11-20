@@ -31,8 +31,29 @@ class Sale extends Model
         'discount',
         'status',
         'payment_method', // <--- تأكد من وجوده هنا
-        'wallet_phone',   // <--- تأكد من وجوده هنا
+        'wallet_phone',   // رقم جوال/محفظة المحوِّل
+        'payer_name',     // اسم المحوِّل (بنك/محفظة)
+        'payer_account',  // رقم حساب المحوِّل
+        'transfer_ref',   // رقم العملية
+        'client_uuid',    // رمز الفاتورة من جهاز البيع (بيع بدون إنترنت)
+        'offline_number', // الرقم المؤقت المطبوع للزبون
+        'offline_at',     // وقت البيع الفعلي على الجهاز
+        'needs_review',
+        'review_note',
+        'reviewed_by',
+        'reviewed_at',
     ];
+
+    protected $casts = [
+        'offline_at'   => 'datetime',
+        'reviewed_at'  => 'datetime',
+        'needs_review' => 'boolean',
+    ];
+
+    public function reviewer()
+    {
+        return $this->belongsTo(User::class, 'reviewed_by')->withTrashed();
+    }
 
     public function organization()
     {

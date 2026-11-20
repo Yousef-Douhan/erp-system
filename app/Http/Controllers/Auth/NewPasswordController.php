@@ -33,6 +33,12 @@ class NewPasswordController extends Controller
             'token' => ['required'],
             'email' => ['required', 'email'],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
+        ], [
+            'email.required'     => 'اكتب البريد الإلكتروني.',
+            'email.email'        => 'صيغة البريد الإلكتروني غير صحيحة.',
+            'password.required'  => 'اكتب كلمة المرور الجديدة.',
+            'password.confirmed' => 'كلمتا المرور غير متطابقتين.',
+            'password.min'       => 'كلمة المرور يجب أن تكون 8 أحرف على الأقل.',
         ]);
 
         // Here we will attempt to reset the user's password. If it is successful we
@@ -53,9 +59,15 @@ class NewPasswordController extends Controller
         // If the password was successfully reset, we will redirect the user back to
         // the application's home authenticated view. If there is an error we can
         // redirect them back to where they came from with their error message.
+        $messages = [
+            Password::INVALID_TOKEN   => 'رابط الاستعادة غير صالح أو انتهت صلاحيته. اطلب رابطاً جديداً.',
+            Password::INVALID_USER    => 'رابط الاستعادة غير صالح لهذا البريد. اطلب رابطاً جديداً.',
+            Password::RESET_THROTTLED => 'محاولات كثيرة. انتظر دقيقة ثم حاول مرة أخرى.',
+        ];
+
         return $status == Password::PASSWORD_RESET
-                    ? redirect()->route('login')->with('status', __($status))
+                    ? redirect()->route('login')->with('status', 'تم تغيير كلمة المرور بنجاح. سجّل دخولك بكلمة المرور الجديدة.')
                     : back()->withInput($request->only('email'))
-                            ->withErrors(['email' => __($status)]);
+                            ->withErrors(['email' => $messages[$status] ?? 'تعذّر تغيير كلمة المرور. اطلب رابطاً جديداً.']);
     }
 }

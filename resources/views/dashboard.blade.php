@@ -55,8 +55,6 @@
             'tone' => $stats['expired'] ? 'bad' : ($stats['expiring'] ? 'warn' : 'good')],
         ['title' => 'الجرد', 'desc' => 'عدّ الرفوف ومطابقة الكميات مع النظام وتسوية الفروقات', 'route' => 'stock-counts.index', 'can' => ['stock_count'], 'icon' => 'clipboard', 'theme' => 'cyan',
             'badge' => 'جرد دوري', 'tone' => 'muted'],
-        ['title' => 'توريد بضاعة', 'desc' => 'إدخال كميات جديدة للمخزون مع رقم الدفعة والصلاحية', 'route' => 'inventory.transactions.stock-in', 'can' => ['view_pharmacy'], 'icon' => 'box-in', 'theme' => 'cyan',
-            'badge' => 'إدخال سريع', 'tone' => 'muted'],
         ['title' => 'المشتريات', 'desc' => 'فواتير الشراء من الموردين ومدفوعاتها', 'route' => 'purchases.index', 'can' => ['view_purchases'], 'icon' => 'cart', 'theme' => 'orange',
             'badge' => $stats['today_purchases'] ? $plural($stats['today_purchases'], 'فاتورة اليوم', 'فواتير اليوم') : 'لا مشتريات اليوم', 'tone' => 'muted'],
         ['title' => 'الموردون', 'desc' => 'بيانات الموردين وحد الائتمان وحساباتهم', 'route' => 'suppliers.index', 'can' => ['view_purchases'], 'icon' => 'truck', 'theme' => 'sky',
@@ -81,7 +79,7 @@
     // اختصارات سريعة داخل الشريط الترحيبي
     $actions = array_values(array_filter([
         ['label' => 'بيع جديد', 'icon' => 'pos', 'route' => 'pos.index', 'can' => ['manage_sales']],
-        ['label' => 'توريد بضاعة', 'icon' => 'box-in', 'route' => 'inventory.transactions.stock-in', 'can' => ['view_pharmacy']],
+        ['label' => 'توريد بضاعة', 'icon' => 'box-in', 'route' => 'purchases.index', 'can' => ['create_purchases']],
         ['label' => 'فاتورة شراء', 'icon' => 'cart', 'route' => 'purchases.index', 'can' => ['view_purchases']],
         ['label' => 'تسجيل مصروف', 'icon' => 'wallet', 'route' => 'expenses.index', 'can' => ['manage_accounting']],
         ['label' => 'دفتر الديون', 'icon' => 'debt', 'route' => 'debts.index', 'can' => ['manage_sales', 'view_customers']],
@@ -276,7 +274,7 @@
                         <span>
                             <span class="home-kpi-label">المحصَّل</span>
                             <span class="home-kpi-value num" style="display:block">{{ $n($todayFigures['collected']) }}<small>₪</small></span>
-                            <span class="home-kpi-note">آجل: <span class="num">{{ $n(max(0, $todayFigures['sales'] - $todayFigures['collected'])) }}</span></span>
+                            <span class="home-kpi-note">@if ($todayFigures['debt_collected'] > 0) منها تحصيل ديون: <span class="num">{{ $n($todayFigures['debt_collected']) }}</span> · @endif آجل اليوم: <span class="num">{{ $n($todayFigures['credit']) }}</span></span>
                         </span>
                     </div>
                     <a class="home-kpi" href="{{ Route::has('purchases.index') && $user->can('view_purchases') ? route('purchases.index') : '#' }}">

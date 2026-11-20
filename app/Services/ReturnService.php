@@ -128,8 +128,12 @@ class ReturnService
             if ($debtReduction > 0) {
                 SaleService::reduceDebt((int) $sale->customer_id, $debtReduction, "مرتجع {$return->return_number} على فاتورة {$sale->invoice_number}", 'sale_return');
             }
+            if ($refund > 0 && !$isCash) {
+                // المبلغ يُحوَّل للزبون عن طريق البنك/المحفظة: نتأكد لاحقاً أنه حُوِّل فعلاً
+                TransferCheckService::record($sale, $refund, (string) $sale->payment_method, 'refund', 'out');
+            }
             if ($register) {
-                $register->decrement('current_balance', $refund);
+                CashBook::out($register, $refund, 'sale_refund', "مرتجع {$return->return_number} من فاتورة {$sale->invoice_number}", 'sale_return', $return->id);
             }
 
             // ---------- القيد المحاسبي ----------

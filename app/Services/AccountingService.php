@@ -20,9 +20,12 @@ class AccountingService
     public const BANK        = ['1020', 'البنك والمحافظ الإلكترونية', 'asset'];
     public const RECEIVABLES = ['1200', 'ذمم العملاء (المدينون)', 'asset'];
     public const PAYABLES    = ['2100', 'ذمم الموردين (الدائنون)', 'liability'];
+    public const OWNER       = ['3100', 'جاري المالك (إيداعات ومسحوبات)', 'equity'];
     public const SALES       = ['4100', 'إيرادات المبيعات', 'revenue'];
     public const SALES_RETURNS = ['4150', 'مردودات المبيعات', 'revenue'];
     public const OTHER_INCOME = ['4900', 'إيرادات أخرى', 'revenue'];
+    public const PURCHASES   = ['5000', 'المشتريات (تكلفة البضاعة)', 'expense'];
+    public const PURCHASE_RETURNS = ['5050', 'مردودات المشتريات', 'expense'];
     public const EXPENSES    = ['5100', 'المصروفات التشغيلية', 'expense'];
     public const OTHER_EXPENSES = ['5900', 'مصروفات أخرى', 'expense'];
 

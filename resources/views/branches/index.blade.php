@@ -8,6 +8,7 @@
 @endsection
 
 @section('content')
+<div class="max-w-7xl mx-auto">@include('partials.subnav', ['set' => 'org'])</div>
 @include('partials.flash', ['withSuccess' => false])
     <div class="space-y-6">
         <!-- رسالة النجاح -->

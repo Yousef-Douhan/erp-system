@@ -99,7 +99,7 @@
                 <a href="{{ route('pos.index') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>بيع جديد</a>
             @endcan
             @can('view_pharmacy')
-                <a href="{{ route('inventory.transactions.stock-in') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v12H3V8M1 3h22v5H1zM12 11v6m-3-3 3 3 3-3"/></svg>توريد بضاعة</a>
+                <a href="{{ route('purchases.index') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v12H3V8M1 3h22v5H1zM12 11v6m-3-3 3 3 3-3"/></svg>توريد بضاعة</a>
             @endcan
             @can('view_purchases')
                 <a href="{{ route('purchases.index') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h2l2.4 12.2a2 2 0 0 0 2 1.8h8.8a2 2 0 0 0 2-1.6L22 7H6"/></svg>فاتورة شراء</a>

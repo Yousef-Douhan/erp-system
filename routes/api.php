@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Api\V1\PurchaseController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -9,20 +8,12 @@ use Illuminate\Support\Facades\Route;
 | API Routes
 |--------------------------------------------------------------------------
 |
-| كل مسارات الـ API محمية بـ Sanctum (لازم Token) وبالصلاحيات.
-| ملاحظة: المسارات القديمة للمنتجات والعملاء والموردين والمبيعات كانت تستدعي
-| Controllers الويب (التي ترجع صفحات HTML وليس JSON) وبدون أي حماية، لذلك تم إيقافها.
+| لا يوجد API عام حالياً. مسار المشتريات القديم (/api/v1/purchases) أُزيل لأنه كان يتجاوز
+| حساب المورد ورصيد الفرع والقيود المحاسبية. أي API جديد يجب أن يستدعي نفس الخدمات
+| التي تستخدمها الشاشات (SupplierLedger، StockService، CashBook...).
 |
 */
 
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/user', function (Request $request) {
-        return $request->user();
-    });
-
-    Route::prefix('v1')->group(function () {
-        // المشتريات (إنشاء فاتورة + دفعات + زيادة المخزون)
-        Route::post('/purchases', [PurchaseController::class, 'store'])
-            ->middleware('permission:create_purchases');
-    });
+Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+    return $request->user()->only(['id', 'username', 'email', 'organization_id', 'branch_id']);
 });

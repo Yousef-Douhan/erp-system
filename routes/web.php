@@ -10,18 +10,13 @@ use App\Http\Controllers\BrandController;
 use App\Http\Controllers\CashRegisterController;
 use App\Http\Controllers\CashShiftController;
 use App\Http\Controllers\CategoryController;
-use App\Http\Controllers\CustomerAccountController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerDebtController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DrugAlertController;
-use App\Http\Controllers\EmployeeBranchController;
-use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\ExpenseController;
-use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryTransactionController;
 use App\Http\Controllers\JournalEntryController;
-use App\Http\Controllers\ManufacturerController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\PaymentMethodController;
@@ -31,7 +26,6 @@ use App\Http\Controllers\ProductBarcodeController;
 use App\Http\Controllers\ProductBatchController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductImportController;
-use App\Http\Controllers\ProductStockSettingController;
 use App\Http\Controllers\ProductUnitController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PurchaseController;
@@ -39,7 +33,6 @@ use App\Http\Controllers\PurchaseItemController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SaleController;
-use App\Http\Controllers\SaleItemController;
 use App\Http\Controllers\SaleReturnController;
 use App\Http\Controllers\StockCountController;
 use App\Http\Controllers\StockTransferController;
@@ -81,27 +74,17 @@ Route::middleware('auth')->group(function () {
 
     // ================= الإدارة: المستخدمين والأدوار =================
     Route::resource('roles', RoleController::class)->middleware('permission:manage_roles');
-    Route::resource('users', UserController::class)->middleware('permission:manage_users');
+    Route::resource('users', UserController::class)->except(['create', 'show', 'edit'])->middleware('permission:manage_users'); // الإضافة من نافذة في صفحة المستخدمين
 
     // ================= إعدادات المنشأة =================
     Route::middleware('permission:manage_settings')->group(function () {
         Route::resource('organizations', OrganizationController::class)->except(['create', 'show', 'edit']);
         Route::resource('branches', BranchController::class)->except(['create', 'show', 'edit']);
-        Route::resource('employees', EmployeeController::class)->except(['create', 'show', 'edit']);
-        Route::resource('employee-branches', EmployeeBranchController::class)->except(['create', 'show', 'edit']);
         Route::resource('payment-methods', PaymentMethodController::class)->except(['create', 'show', 'edit']);
     });
 
     // ================= الصيدلية والمخزون =================
     Route::middleware('permission:view_pharmacy')->group(function () {
-        // الحركات المخزنية (قبل الـ Resource لتجنب التعارض مع inventory/{inventory})
-        Route::prefix('inventory')->name('inventory.')->group(function () {
-            Route::get('/transactions', [InventoryTransactionController::class, 'index'])->name('transactions.index');
-            Route::get('/stock-in', [InventoryTransactionController::class, 'createStockIn'])->name('transactions.stock-in');
-            Route::post('/stock-in', [InventoryTransactionController::class, 'storeStockIn'])->name('transactions.store-in');
-        });
-
-        Route::resource('inventory', InventoryController::class)->except(['show']);
         Route::resource('categories', CategoryController::class)->except(['create', 'show', 'edit']);
         Route::resource('brands', BrandController::class)->except(['create', 'show', 'edit']);
         Route::resource('units', UnitController::class)->except(['create', 'show', 'edit']);
@@ -111,19 +94,16 @@ Route::middleware('auth')->group(function () {
         Route::post('products/import/preview', [ProductImportController::class, 'preview'])->name('products.import.preview');
         Route::post('products/import', [ProductImportController::class, 'store'])->name('products.import.store');
         Route::resource('products', ProductController::class)->except(['create', 'show', 'edit']);
-        Route::resource('manufacturers', ManufacturerController::class)->except(['create', 'show', 'edit']);
-        Route::resource('products.units', ProductUnitController::class);
+        Route::resource('products.units', ProductUnitController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::resource('products.units.barcodes', ProductBarcodeController::class)->except(['create', 'show', 'edit']);
-        Route::resource('stock-settings', ProductStockSettingController::class)->except(['create', 'show', 'edit']);
-        Route::resource('inventory-transactions', InventoryTransactionController::class)->only(['index', 'store', 'update', 'destroy']);
+        Route::get('inventory-transactions', [InventoryTransactionController::class, 'index'])->name('inventory-transactions.index'); // للعرض فقط
         Route::resource('prescriptions', PrescriptionController::class)->except(['create', 'show', 'edit']);
         Route::resource('drug-alerts', DrugAlertController::class)->except(['create', 'show', 'edit']);
 
         // الدفعات (Batches)
+        // الدفعات للعرض فقط + تصحيح التواريخ. الكميات تتغير بالشراء/البيع/النقل/المرتجع/الإتلاف فقط
         Route::get('batches', [ProductBatchController::class, 'indexAll'])->name('batches.index');
-        Route::post('batches', [ProductBatchController::class, 'storeAll'])->name('batches.store');
         Route::put('batches/{batch}', [ProductBatchController::class, 'updateAll'])->name('batches.update');
-        Route::delete('batches/{batch}', [ProductBatchController::class, 'destroyAll'])->name('batches.destroy');
     });
 
     // ================= المبيعات ونقطة البيع =================
@@ -131,13 +111,14 @@ Route::middleware('auth')->group(function () {
         Route::get('/pos', [PosController::class, 'index'])->name('pos.index');
         Route::post('/pos/store', [PosController::class, 'store'])->name('pos.store');
         Route::post('/pos/customer', [PosController::class, 'storeCustomer'])->name('pos.customer.store');
+        // البيع بدون إنترنت: فحص الاتصال ورفع الفواتير المحفوظة على الجهاز
+        Route::get('/pos/ping', [\App\Http\Controllers\OfflineSyncController::class, 'ping'])->name('pos.ping');
+        Route::post('/pos/sync', [\App\Http\Controllers\OfflineSyncController::class, 'sync'])->name('pos.sync')->middleware('throttle:60,1');
 
-        Route::resource('sales', SaleController::class)->except(['create', 'edit']);
+        // الفواتير تُنشأ من نقطة البيع فقط، والتعديل لبيانات العميل فقط (لا مبالغ ولا أصناف)
+        Route::resource('sales', SaleController::class)->except(['create', 'store', 'edit']);
         Route::post('/sales/{sale}/pay', [SaleController::class, 'pay'])->name('sales.pay');
         Route::get('/sales/{sale}/receipt', [SaleController::class, 'receipt'])->name('sales.receipt');
-        Route::post('sales/{sale}/items', [SaleItemController::class, 'store'])->name('sale-items.store');
-        Route::put('sale-items/{saleItem}', [SaleItemController::class, 'update'])->name('sale-items.update');
-        Route::delete('sale-items/{saleItem}', [SaleItemController::class, 'destroy'])->name('sale-items.destroy');
     });
 
     // ================= العملاء والديون =================
@@ -150,21 +131,42 @@ Route::middleware('auth')->group(function () {
 
     // ================= المشتريات والموردين =================
     Route::middleware('permission:view_purchases')->group(function () {
+        Route::get('suppliers/{supplier}/statement', [SupplierAccountController::class, 'show'])->name('suppliers.statement');
         Route::resource('suppliers', SupplierController::class)->except(['create', 'show', 'edit']);
         Route::resource('purchases', PurchaseController::class)->except(['create', 'show', 'edit']);
         Route::post('/purchases/{purchase}/items', [PurchaseItemController::class, 'store'])->name('purchase-items.store');
         Route::post('/purchases/{purchase}/pay', [PurchaseController::class, 'pay'])->name('purchases.pay');
+        Route::get('/supplier-payments', [\App\Http\Controllers\SupplierPaymentController::class, 'index'])->name('supplier-payments.index')->middleware('permission:pay_suppliers');
+        Route::post('/supplier-payments', [\App\Http\Controllers\SupplierPaymentController::class, 'store'])->name('supplier-payments.store')->middleware('permission:pay_suppliers');
         Route::put('/purchase-items/{purchaseItem}', [PurchaseItemController::class, 'update'])->name('purchase-items.update');
+
+        // اقتراح طلبية شراء (قراءة فقط)
+        Route::get('/reorder', [\App\Http\Controllers\ReorderController::class, 'index'])->name('reorder.index');
+
+        // مرتجعات المشتريات للمورد
+        Route::get('/purchase-returns', [\App\Http\Controllers\PurchaseReturnController::class, 'index'])->name('purchase-returns.index');
+        Route::get('/purchase-returns/{purchaseReturn}', [\App\Http\Controllers\PurchaseReturnController::class, 'show'])->name('purchase-returns.show')->whereNumber('purchaseReturn');
+        Route::middleware('permission:create_purchases')->group(function () {
+            Route::get('/purchases/{purchase}/return', [\App\Http\Controllers\PurchaseReturnController::class, 'create'])->name('purchase-returns.create');
+            Route::post('/purchases/{purchase}/return', [\App\Http\Controllers\PurchaseReturnController::class, 'store'])->name('purchase-returns.store');
+        });
         Route::delete('/purchase-items/{purchaseItem}', [PurchaseItemController::class, 'destroy'])->name('purchase-items.destroy');
     });
 
     // ================= المحاسبة =================
     Route::middleware('permission:manage_accounting')->group(function () {
+        // مراجعة فواتير البيع بدون إنترنت
+        Route::get('/offline-sales', [\App\Http\Controllers\OfflineSyncController::class, 'review'])->name('offline-sales.index');
+        Route::post('/offline-sales/{sale}/reviewed', [\App\Http\Controllers\OfflineSyncController::class, 'markReviewed'])->name('offline-sales.reviewed');
         Route::resource('accounts', AccountController::class);
-        Route::resource('journal-entries', JournalEntryController::class);
-        Route::resource('customer-accounts', CustomerAccountController::class)->only(['index', 'store', 'show']);
-        Route::resource('supplier-accounts', SupplierAccountController::class)->only(['index', 'store', 'show']);
-        Route::resource('cash-registers', CashRegisterController::class)->except(['create', 'show', 'edit']);
+        // القيود لا تُحذف: الخطأ يُلغى بقيد عكسي. قيود النظام لا تُعدَّل
+        Route::resource('journal-entries', JournalEntryController::class)->only(['index', 'store', 'update']);
+        Route::post('journal-entries/{journalEntry}/reverse', [JournalEntryController::class, 'reverse'])->name('journal-entries.reverse');
+
+        Route::post('cash-registers/transfer', [CashRegisterController::class, 'transfer'])->name('cash-registers.transfer');
+        Route::post('cash-registers/{cashRegister}/deposit', [CashRegisterController::class, 'deposit'])->name('cash-registers.deposit');
+        Route::post('cash-registers/{cashRegister}/withdraw', [CashRegisterController::class, 'withdraw'])->name('cash-registers.withdraw');
+        Route::resource('cash-registers', CashRegisterController::class)->except(['create', 'edit']);
         Route::resource('expenses', ExpenseController::class)->except(['create', 'show', 'edit']);
 
         // سندات القبض والصرف
@@ -196,6 +198,10 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:stock_count')->group(function () {
         Route::resource('stock-counts', StockCountController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
         Route::post('/stock-counts/{stockCount}/post', [StockCountController::class, 'post'])->name('stock-counts.post');
+
+        // إتلاف منتهي الصلاحية / التالف
+        Route::get('/disposals', [\App\Http\Controllers\StockDisposalController::class, 'index'])->name('disposals.index');
+        Route::post('/batches/{batch}/dispose', [\App\Http\Controllers\StockDisposalController::class, 'store'])->name('disposals.store');
     });
 
     // ================= المستودعات ونقل المخزون =================
@@ -213,6 +219,7 @@ Route::middleware('auth')->group(function () {
 
     // ================= التقارير =================
     Route::middleware('permission:view_reports')->prefix('reports')->name('reports.')->group(function () {
+        Route::get('/sales', [ReportController::class, 'sales'])->name('sales');
         Route::get('/profit', [ReportController::class, 'profit'])->name('profit');
         Route::get('/employees', [ReportController::class, 'employees'])->name('employees');
         Route::get('/slow-moving', [ReportController::class, 'slowMoving'])->name('slow');
@@ -224,6 +231,25 @@ Route::middleware('auth')->group(function () {
         Route::post('/backups', [BackupController::class, 'store'])->name('backups.store');
         Route::get('/backups/{file}', [BackupController::class, 'download'])->name('backups.download');
         Route::delete('/backups/{file}', [BackupController::class, 'destroy'])->name('backups.destroy');
+    });
+
+    // ================= مطابقة الحوالات (بنك / محافظ) =================
+    // الرؤية: من يطابق أو من يرفع المستندات. التأكيد: verify_transfers. رفع/حذف المستندات: upload_transfer_docs
+    Route::middleware('permission:verify_transfers|upload_transfer_docs')->group(function () {
+        Route::get('/transfers', [\App\Http\Controllers\TransferCheckController::class, 'index'])->name('transfers.index');
+        Route::get('/transfers/{transferCheck}/proof', [\App\Http\Controllers\TransferCheckController::class, 'proof'])->name('transfers.proof');
+        Route::get('/transfer-statements/{transferStatement}', [\App\Http\Controllers\TransferCheckController::class, 'statementFile'])->name('transfers.statement');
+    });
+    Route::middleware('permission:verify_transfers')->group(function () {
+        Route::post('/transfers/bulk', [\App\Http\Controllers\TransferCheckController::class, 'bulk'])->name('transfers.bulk');
+        Route::post('/transfers/{transferCheck}/confirm', [\App\Http\Controllers\TransferCheckController::class, 'confirm'])->name('transfers.confirm');
+        Route::post('/transfers/{transferCheck}/reject', [\App\Http\Controllers\TransferCheckController::class, 'reject'])->name('transfers.reject');
+        Route::put('/transfers/{transferCheck}', [\App\Http\Controllers\TransferCheckController::class, 'update'])->name('transfers.update');
+        Route::post('/transfers/{transferCheck}/reopen', [\App\Http\Controllers\TransferCheckController::class, 'reopen'])->name('transfers.reopen');
+    });
+    Route::middleware('permission:upload_transfer_docs')->group(function () {
+        Route::post('/transfer-statements', [\App\Http\Controllers\TransferCheckController::class, 'storeDocuments'])->name('transfers.documents.store');
+        Route::delete('/transfer-statements/{transferStatement}', [\App\Http\Controllers\TransferCheckController::class, 'destroyDocument'])->name('transfers.documents.destroy');
     });
 
     // ================= سلة المحذوفات (كل نوع محمي بصلاحية حذفه داخل المتحكم) =================

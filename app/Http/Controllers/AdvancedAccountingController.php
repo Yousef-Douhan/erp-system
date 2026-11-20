@@ -43,8 +43,7 @@ class AdvancedAccountingController extends Controller
                     ['account_id' => $creditAccount->id, 'debit' => 0, 'credit' => $amount],
                 ], AccountingService::nextEntryNumber('RV'), null, 'receipt_voucher');
 
-                CashRegister::whereKey($request->cash_register_id)->lockForUpdate()->firstOrFail()
-                    ->increment('current_balance', $amount);
+                \App\Services\CashBook::in((int) $request->cash_register_id, $amount, 'receipt_voucher', $request->description);
 
                 if ($request->customer_id) {
                     CustomerLedger::recordPayment(
@@ -99,7 +98,7 @@ class AdvancedAccountingController extends Controller
                     ['account_id' => $cash->id, 'debit' => 0, 'credit' => $amount],
                 ], AccountingService::nextEntryNumber('PV'), null, 'payment_voucher');
 
-                $register->decrement('current_balance', $amount);
+                \App\Services\CashBook::out($register, $amount, 'payment_voucher', $request->description);
 
                 if ($request->supplier_id) {
                     $supplier = Supplier::whereKey($request->supplier_id)->lockForUpdate()->firstOrFail();

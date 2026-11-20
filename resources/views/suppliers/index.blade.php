@@ -40,7 +40,7 @@
                     <th class="px-6 py-3">اسم المسؤول</th>
                     <th class="px-6 py-3">اسم الشركة</th>
                     <th class="px-6 py-3">الصيدلية</th>
-                    <th class="px-6 py-3">الرصيد (Balance)</th>
+                    <th class="px-6 py-3">المستحق له</th>
                     <th class="px-6 py-3">الحد الائتماني (Credit Limit)</th>
                     <th class="px-6 py-3 text-center">التحكم</th>
                 </tr>
@@ -56,6 +56,7 @@
                         </td>
                         <td class="px-6 py-4 font-bold text-indigo-600">{{ number_format($supplier->credit_limit, 2) }}</td>
                         <td class="px-6 py-4 text-center flex items-center justify-center gap-2">
+                            <a href="{{ route('suppliers.statement', $supplier) }}" class="text-emerald-700 hover:text-emerald-900 text-xs font-semibold px-2.5 py-1 bg-emerald-50 rounded-lg">كشف الحساب</a>
                             <!-- زر التعديل -->
                             <button onclick='openEditModal(@json($supplier))' class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold px-2.5 py-1 bg-indigo-50 rounded-lg">تعديل</button>
 
@@ -114,7 +115,7 @@
 
             <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">الرصيد الحالي (Balance)</label>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">دين قديم للمورد قبل النظام (رصيد افتتاحي)</label>
                     <input type="number" step="0.01" name="balance" value="0" class="w-full rounded-xl border-slate-200 text-sm" min="0" required>
                 </div>
                 <div>
@@ -163,7 +164,8 @@
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">الرصيد الحالي (Balance)</label>
-                    <input type="number" step="0.01" name="balance" id="edit_balance" class="w-full rounded-xl border-slate-200 text-sm" min="0" required>
+                    <input type="number" step="0.01" id="edit_balance" class="w-full rounded-xl border-slate-200 text-sm bg-slate-50" disabled>
+                    <p class="text-[11px] text-slate-400 mt-1">يتغير تلقائياً مع فواتير الشراء والدفعات. راجعه من «كشف الحساب».</p>
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">الحد الائتماني (Credit Limit)</label>

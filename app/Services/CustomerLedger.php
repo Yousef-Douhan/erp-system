@@ -3,14 +3,13 @@
 namespace App\Services;
 
 use App\Models\Customer;
-use App\Models\CustomerAccount;
 use App\Models\CustomerTransaction;
 use Illuminate\Support\Facades\DB;
 
 /**
  * المصدر الوحيد لتعديل ديون العملاء.
  * كل حركة تُحدّث customers.balance وتُسجَّل في customer_transactions (دفتر الديون)
- * وفي customer_accounts (كشف الحساب المحاسبي) حتى تبقى الشاشتان متطابقتين.
+ * مع نوع الحركة والرصيد بعدها.
  */
 class CustomerLedger
 {
@@ -48,18 +47,12 @@ class CustomerLedger
             $customer->save();
 
             CustomerTransaction::create([
-                'customer_id' => $customer->id,
-                'type'        => $direction,
-                'amount'      => $amount,
-                'notes'       => $notes,
-            ]);
-
-            CustomerAccount::create([
-                'customer_id'      => $customer->id,
-                'transaction_type' => $type,
-                'debit'            => $direction === 'add' ? $amount : 0,
-                'credit'           => $direction === 'subtract' ? $amount : 0,
-                'balance'          => $customer->balance,
+                'customer_id'   => $customer->id,
+                'type'          => $direction,
+                'source'        => $type,
+                'amount'        => $amount,
+                'balance_after' => $customer->balance,
+                'notes'         => $notes,
             ]);
 
             return $customer;

@@ -147,6 +147,11 @@ class ProductController extends Controller
     {
         $this->authorize('delete', $product);
 
+        $qty = (int) \App\Support\Tenancy::bypass(fn () => \App\Models\BranchStock::where('product_id', $product->id)->sum('quantity'));
+        if ($qty > 0) {
+            return redirect()->route('products.index')->with('error', "لا يمكن حذف «{$product->name}» وفي المخزون منه {$qty}. بِعه أو أرجعه للمورد أو أتلفه أولاً، أو أوقفه (غير نشط) بدل الحذف.");
+        }
+
         $product->delete();
         return redirect()->route('products.index')->with('success', 'تم حذف المنتج بنجاح.');
     }

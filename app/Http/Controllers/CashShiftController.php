@@ -51,7 +51,36 @@ class CashShiftController extends Controller
         $shift->load(['cashRegister', 'user', 'closer']);
         $summary = ShiftService::summary($shift);
 
-        return view('shifts.show', compact('shift', 'summary'));
+        // فواتير الكاشير في هذه الوردية فقط
+        $invoices = ShiftService::cashierSales($shift)
+            ->with('customer:id,name')
+            ->latest()
+            ->paginate(30, ['*'], 'page')
+            ->withQueryString();
+
+        // حسب طريقة الدفع
+        $methodNames = \App\Models\PaymentMethod::pluck('name', 'code')->all() + ['cash' => 'نقدي', 'debt' => 'آجل'];
+        $byMethod = ShiftService::cashierSales($shift)
+            ->selectRaw('payment_method, COUNT(*) AS cnt, SUM(total - COALESCE(returned_amount, 0)) AS net, SUM(paid_amount) AS paid')
+            ->groupBy('payment_method')->orderByDesc('net')->get();
+
+        // الأصناف التي باعها
+        $saleIds = ShiftService::cashierSales($shift)->select('id');
+        $topProducts = \App\Models\SaleItem::query()
+            ->join('products', 'products.id', '=', 'sale_items.product_id')
+            ->whereIn('sale_items.sale_id', $saleIds)
+            ->groupBy('sale_items.product_id', 'products.name')
+            ->selectRaw('products.name, SUM((sale_items.quantity - COALESCE(sale_items.returned_quantity, 0)) * COALESCE(sale_items.unit_factor, 1)) AS qty,
+                SUM(sale_items.total * (sale_items.quantity - COALESCE(sale_items.returned_quantity, 0)) / NULLIF(sale_items.quantity, 0)) AS total')
+            ->havingRaw('SUM(sale_items.quantity - COALESCE(sale_items.returned_quantity, 0)) > 0')
+            ->orderByDesc('qty')->limit(10)->get();
+
+        // كل حركات الخزينة خلال الوردية
+        $movements = \App\Models\CashMovement::with('user:id,username')
+            ->where('cash_shift_id', $shift->id)
+            ->orderBy('id')->get();
+
+        return view('shifts.show', compact('shift', 'summary', 'invoices', 'byMethod', 'methodNames', 'topProducts', 'movements'));
     }
 
     public function close(Request $request, CashShift $shift)
@@ -61,7 +90,22 @@ class CashShiftController extends Controller
         $validated = $request->validate([
             'actual_balance' => 'required|numeric|min:0',
             'notes'          => 'nullable|string|max:500',
+            'confirm_cash'   => 'nullable|boolean',
         ]);
+
+        // خطأ شائع: الكاشير يعدّ مدفوعات البنك/المحفظة كأنها نقد في الدرج
+        if ($shift->isOpen() && !$request->boolean('confirm_cash')) {
+            $summary = ShiftService::summary($shift);
+            $surplus = round((float) $validated['actual_balance'] - $summary['expected'], 2);
+            $noncash = $summary['mine']['noncash'];
+            if ($surplus > 0 && $noncash > 0 && $surplus <= $noncash + 0.01) {
+                return back()->withInput()->withErrors([
+                    'actual_balance' => 'المبلغ المُدخل أكبر من المتوقع بـ ' . number_format($surplus, 2) . ' ₪، وفي الوردية مدفوعات بنك/محفظة بقيمة '
+                        . number_format($noncash, 2) . ' ₪. هذه المدفوعات تذهب للحساب البنكي ولا تكون في الدرج — لا تعدّها. '
+                        . 'إذا كان المبلغ نقداً فعلاً في الدرج، علّم «أؤكد أن المبلغ نقدي» وأعد الإغلاق.',
+                ]);
+            }
+        }
 
         $shift = ShiftService::close($shift, (float) $validated['actual_balance'], $request->user(), $validated['notes'] ?? null);
 

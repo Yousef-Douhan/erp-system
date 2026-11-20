@@ -24,7 +24,9 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->name(),
+            // جدول المستخدمين يستعمل username بدل name
+            'username' => fake()->unique()->userName() . random_int(100, 999),
+            'is_active' => true,
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),

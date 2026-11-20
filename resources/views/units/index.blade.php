@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
+<div class="max-w-7xl mx-auto">@include('partials.subnav', ['set' => 'catalog'])</div>
 <div class="max-w-7xl mx-auto space-y-6">
     <!-- Header & Add Button -->
     <div class="flex items-center justify-between">

@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
+<div class="max-w-7xl mx-auto">@include('partials.subnav', ['set' => 'accounts'])</div>
 <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
     <!-- نموذج الإضافة والتعديل -->
     <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 h-fit">

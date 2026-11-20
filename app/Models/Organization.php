@@ -24,7 +24,10 @@ class Organization extends Model
         'currency',
         'timezone',
         'status',
+        'require_shift',
     ];
+
+    protected $casts = ['require_shift' => 'boolean'];
 
     public function branches()
     {

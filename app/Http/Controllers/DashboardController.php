@@ -50,10 +50,24 @@ class DashboardController extends Controller
                 ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(amount), 0) as total')
                 ->first();
 
+            // المحصّل اليوم = كل مال دخل فعلاً اليوم: حركات الخزائن (بيع نقدي، دفعات على فواتير، تحصيل ديون، سندات قبض)
+            // ناقص الرد النقدي للمرتجعات وإلغاء الفواتير، زائد المبيعات غير النقدية (محفظة/بنك) لأنها لا تمر على خزينة
+            $cash = \App\Models\CashMovement::whereDate('created_at', $today)
+                ->selectRaw("COALESCE(SUM(CASE WHEN direction = 'in' AND type IN ('sale', 'sale_payment', 'debt_collection', 'receipt_voucher') THEN amount ELSE 0 END), 0) AS cash_in")
+                ->selectRaw("COALESCE(SUM(CASE WHEN direction = 'out' AND type IN ('sale_refund', 'sale_cancel') THEN amount ELSE 0 END), 0) AS cash_out")
+                ->selectRaw("COALESCE(SUM(CASE WHEN type IN ('sale_payment', 'debt_collection', 'receipt_voucher') THEN amount ELSE 0 END), 0) AS debts")
+                ->first();
+            $nonCash = (float) Sale::visibleTo($user)->whereDate('created_at', $today)->whereNull('cash_register_id')->sum('paid_amount');
+            // سداد ديون بمحفظة/بنك (مع فاتورة أو على فاتورة قديمة): لا يمر على خزينة فيُؤخذ من دفتر العملاء
+            $nonCashDebts = (float) \App\Models\CustomerTransaction::whereDate('created_at', $today)
+                ->where('type', 'subtract')->where('source', 'payment_noncash')->sum('amount');
+
             $todayFigures = [
                 'sales'           => (float) $sales->total,
                 'sales_count'     => (int) $sales->cnt,
-                'collected'       => (float) $sales->paid,
+                'collected'       => round((float) $cash->cash_in - (float) $cash->cash_out + $nonCash + $nonCashDebts, 2),
+                'debt_collected'  => round((float) $cash->debts + $nonCashDebts, 2),
+                'credit'          => round(max(0, (float) $sales->total - (float) $sales->paid), 2),
                 'purchases'       => (float) $purchases->total,
                 'purchases_count' => (int) $purchases->cnt,
                 'expenses'        => (float) $expenses->total,
@@ -85,6 +99,13 @@ class DashboardController extends Controller
             ['show' => $canPharmacy,  'count' => $stats['low_stock'],        'tone' => 'amber', 'icon' => 'pill',   'route' => 'products.index',  'text' => 'أصناف قاربت على النفاد'],
             ['show' => $canPharmacy,  'count' => $stats['expiring'],         'tone' => 'amber', 'icon' => 'layers', 'route' => 'batches.index',   'text' => 'دفعات تنتهي خلال 30 يوماً'],
             ['show' => $canCustomers, 'count' => $stats['over_limit'],       'tone' => 'red',   'icon' => 'debt',   'route' => 'debts.index',     'text' => 'عملاء تجاوزوا حد الدين'],
+            ['show' => $user->can('verify_transfers'), 'count' => $user->can('verify_transfers') ? \App\Models\TransferCheck::where('status', 'pending')->whereDate('created_at', '<', $today)->count() : 0,
+                'tone' => 'amber', 'icon' => 'wallet', 'route' => 'transfers.index', 'text' => 'حوالات بنك/محفظة من أيام سابقة لم يُتأكد من وصولها'],
+            ['show' => $user->can('verify_transfers'), 'count' => $user->can('verify_transfers') ? \App\Models\TransferCheck::where('status', 'rejected')->count() : 0,
+                'tone' => 'red', 'icon' => 'wallet', 'route' => 'transfers.index', 'text' => 'حوالات سُجّلت «لم تصل» — تابعها مع الزبائن'],
+            ['show' => $user->can('manage_accounting'), 'count' => $user->can('manage_accounting') && \Illuminate\Support\Facades\Schema::hasColumn('sales', 'needs_review')
+                    ? \App\Models\Sale::where('needs_review', true)->whereNull('reviewed_at')->count() : 0,
+                'tone' => 'amber', 'icon' => 'receipt', 'route' => 'offline-sales.index', 'text' => 'فواتير بيع بدون إنترنت بحاجة مراجعة'],
             ['show' => $canPurchases, 'count' => $stats['unpaid_purchases'], 'tone' => 'blue',  'icon' => 'truck',  'route' => 'purchases.index', 'text' => 'فواتير شراء لم تُسدَّد بالكامل'],
         ])->filter(fn ($a) => $a['show'] && $a['count'] > 0)->values();
 

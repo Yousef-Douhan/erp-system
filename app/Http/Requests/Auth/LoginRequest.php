@@ -27,9 +27,29 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email'],
+            // الحقل اسمه email لكنه يقبل اسم المستخدم أو البريد الإلكتروني
+            'email' => ['required', 'string', 'max:255'],
             'password' => ['required', 'string'],
         ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'email.required'    => 'اكتب اسم المستخدم أو البريد الإلكتروني.',
+            'password.required' => 'اكتب كلمة المرور.',
+        ];
+    }
+
+    /** عمود الدخول: البريد إذا كان المُدخل بريداً، وإلا اسم المستخدم */
+    private function loginColumn(): string
+    {
+        return filter_var(trim((string) $this->input('email')), FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
+    }
+
+    private function credentials(): array
+    {
+        return [$this->loginColumn() => trim((string) $this->input('email')), 'password' => (string) $this->input('password')];
     }
 
     /**
@@ -42,7 +62,7 @@ class LoginRequest extends FormRequest
         $this->ensureIsNotRateLimited();
 
         // الحساب الموقوف: رسالة واضحة بدل "بيانات الدخول غير صحيحة"
-        $user = \App\Models\User::where('email', $this->input('email'))->first();
+        $user = \App\Models\User::where($this->loginColumn(), trim((string) $this->input('email')))->first();
         if ($user && ! $user->is_active && \Illuminate\Support\Facades\Hash::check((string) $this->input('password'), $user->password)) {
             RateLimiter::hit($this->throttleKey());
 
@@ -52,11 +72,11 @@ class LoginRequest extends FormRequest
         }
 
         // منع المستخدمين الموقوفين (is_active = false) من تسجيل الدخول
-        if (! Auth::attempt($this->only('email', 'password') + ['is_active' => true], $this->boolean('remember'))) {
+        if (! Auth::attempt($this->credentials() + ['is_active' => true], $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
+                'email' => 'اسم المستخدم/البريد أو كلمة المرور غير صحيحة.',
             ]);
         }
 
@@ -79,10 +99,7 @@ class LoginRequest extends FormRequest
         $seconds = RateLimiter::availableIn($this->throttleKey());
 
         throw ValidationException::withMessages([
-            'email' => trans('auth.throttle', [
-                'seconds' => $seconds,
-                'minutes' => ceil($seconds / 60),
-            ]),
+            'email' => 'محاولات دخول كثيرة. حاول مرة أخرى بعد ' . ($seconds > 60 ? ceil($seconds / 60) . ' دقيقة' : $seconds . ' ثانية') . '.',
         ]);
     }
 

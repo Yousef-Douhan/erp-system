@@ -63,7 +63,7 @@
                                     <div class="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 font-bold flex items-center justify-center text-xs">
                                         {{ mb_substr($user->username ?? $user->name, 0, 2) }}
                                     </div>
-                                    {{ $user->username ?? $user->name }}
+                                    <div>{{ $user->username ?? $user->name }}@if ($user->full_name)<div class="text-[11px] font-normal text-slate-400">{{ $user->full_name }}</div>@endif</div>
                                 </td>
                                 <td class="px-6 py-4 font-mono text-slate-500" dir="ltr">{{ $user->email }}</td>
                                 <td class="px-6 py-4">
@@ -143,6 +143,16 @@
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">الاسم الكامل</label>
+                        <input type="text" name="full_name" maxlength="255" placeholder="مثال: أحمد خليل" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">الراتب الشهري (₪)</label>
+                        <input type="number" name="salary" step="0.01" min="0" placeholder="0.00" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none" dir="ltr">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
                         <label class="block text-xs font-bold text-slate-700 mb-1">رقم الهاتف</label>
                         <input type="text" name="phone" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none" dir="ltr">
                     </div>
@@ -200,6 +210,16 @@
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">الاسم الكامل</label>
+                        <input type="text" id="edit_full_name" name="full_name" maxlength="255" placeholder="مثال: أحمد خليل" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">الراتب الشهري (₪)</label>
+                        <input type="number" id="edit_salary" name="salary" step="0.01" min="0" placeholder="0.00" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none" dir="ltr">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
                         <label class="block text-xs font-bold text-slate-700 mb-1">رقم الهاتف</label>
                         <input type="text" id="edit_phone" name="phone" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none" dir="ltr">
                     </div>
@@ -249,6 +269,8 @@
             document.getElementById('edit_username').value = user.username || user.name || '';
             document.getElementById('edit_email').value = user.email || '';
             document.getElementById('edit_phone').value = user.phone || '';
+            document.getElementById('edit_full_name').value = user.full_name || '';
+            document.getElementById('edit_salary').value = user.salary ?? '';
             const orgSel = document.getElementById('edit_organization_id');
             if (orgSel) { orgSel.value = user.organization_id || ''; orgSel.dispatchEvent(new Event('change')); }
             const branchSel = document.getElementById('edit_branch_id');

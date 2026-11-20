@@ -37,6 +37,10 @@ class PurchaseItemController extends Controller
     {
         $this->authorize('update', $purchaseItem->purchase);
 
+        if ((int) $purchaseItem->returned_quantity > 0) {
+            return back()->with('error', 'لا يمكن تعديل صنف أُرجع جزء منه للمورد.');
+        }
+
         $validated = $this->validateItem($request);
         $validated['total'] = $validated['quantity'] * $validated['unit_cost'];
 
@@ -56,6 +60,10 @@ class PurchaseItemController extends Controller
     public function destroy(PurchaseItem $purchaseItem)
     {
         $this->authorize('update', $purchaseItem->purchase);
+
+        if ((int) $purchaseItem->returned_quantity > 0) {
+            return back()->with('error', 'لا يمكن حذف صنف أُرجع جزء منه للمورد.');
+        }
 
         DB::transaction(function () use ($purchaseItem) {
             $purchase = $purchaseItem->purchase;
@@ -139,11 +147,15 @@ class PurchaseItemController extends Controller
     // دالة مساعدة لإعادة حساب إجمالي فاتورة الشراء وحالتها
     private function updatePurchaseTotal(Purchase $purchase): void
     {
+        $old = (float) $purchase->fresh()->total;
         $total = (float) $purchase->items()->sum('total');
 
         $purchase->update([
             'total'  => $total,
-            'status' => SaleService::statusFor($total, (float) $purchase->paid_amount),
+            'status' => SaleService::statusFor(max(0, $total - (float) $purchase->returned_amount), (float) $purchase->paid_amount),
         ]);
+
+        // رصيد المورد وكشفه والقيد يتبعون إجمالي الفاتورة
+        \App\Services\SupplierLedger::syncPurchase($purchase, $old, $total);
     }
 }

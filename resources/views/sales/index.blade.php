@@ -6,13 +6,13 @@
     <div class="flex items-center justify-between">
         <div>
             <h2 class="text-xl font-extrabold text-slate-800">إدارة المبيعات (Sales)</h2>
-            <p class="text-xs text-slate-400 mt-1">متابعة فواتير المبيعات، المبالغ المدفوعة، وحالة الدفع</p>
+            <p class="text-xs text-slate-400 mt-1">الفواتير تُنشأ من نقطة البيع فقط. أي تغيير على المبالغ أو الأصناف يكون بمرتجع أو بتسجيل دفعة.</p>
         </div>
-        @can('create', \App\Models\Sale::class)
-        <button onclick="openModal('addModal')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-md transition-all flex items-center gap-2">
+        @can('manage_sales')
+        <a href="{{ route('pos.index') }}" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-md transition-all flex items-center gap-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-            إضافة فاتورة جديدة
-        </button>
+            بيع جديد من نقطة البيع
+        </a>
         @endcan
     </div>
 
@@ -122,9 +122,14 @@
                             <!-- زر العرض -->
                             <a href="{{ route('sales.show', $sale->id) }}" class="text-emerald-600 hover:text-emerald-800 text-xs font-semibold px-2.5 py-1 bg-emerald-50 rounded-lg">عرض</a>
 
+                            <!-- زر المرتجع -->
+                            @if (Route::has('returns.create') && auth()->user()->can('return_sales'))
+                            <a href="{{ route('returns.create', $sale->id) }}" class="text-xs font-semibold px-2.5 py-1 rounded-lg" style="color:var(--amber);background:var(--amber-soft)">مرتجع</a>
+                            @endif
+
                             <!-- زر التعديل -->
                             @can('update', $sale)
-                            <button onclick='openEditModal(@json($sale))' class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold px-2.5 py-1 bg-indigo-50 rounded-lg">تعديل</button>
+                            <button type="button" data-sale="{{ json_encode($sale->only(['id', 'invoice_number', 'customer_id', 'customer_name', 'wallet_phone'])) }}" onclick="openEditModal(JSON.parse(this.dataset.sale))" class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold px-2.5 py-1 bg-indigo-50 rounded-lg">تعديل</button>
                             @endcan
 
                             <!-- زر الحذف -->
@@ -150,163 +155,30 @@
     </div>
 </div>
 
-<!-- Modal إضافة فاتورة جديدة -->
-<div id="addModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 hidden">
-    <div class="bg-white rounded-2xl p-6 w-full max-w-xl space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
-        <h3 class="text-lg font-bold text-slate-800">إضافة فاتورة مبيعات جديدة</h3>
-        
-        <form action="{{ route('sales.store') }}" method="POST" class="space-y-4">
-            @csrf
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">المنظمة</label>
-                    <select name="organization_id" class="w-full rounded-xl border-slate-200 text-sm" required>
-                        <option value="">اختر المنظمة</option>
-                        @foreach($organizations as $org)
-                            <option value="{{ $org->id }}">{{ $org->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">الفرع</label>
-                    <select name="branch_id" class="w-full rounded-xl border-slate-200 text-sm" required>
-                        <option value="">اختر الفرع</option>
-                        @foreach($branches as $branch)
-                            <option value="{{ $branch->id }}">{{ $branch->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">العميل (اختيار من القائمة)</label>
-                    <select name="customer_id" id="add_customer_id" class="w-full rounded-xl border-slate-200 text-sm" onchange="fillCustomerName(this, 'add_customer_name')">
-                        <option value="">اختر العميل</option>
-                        @foreach($customers as $customer)
-                            <option value="{{ $customer->id }}" data-name="{{ $customer->name }}">{{ $customer->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">أو اسم العميل (نصي)</label>
-                    <input type="text" name="customer_name" id="add_customer_name" class="w-full rounded-xl border-slate-200 text-sm" placeholder="اسم العميل الخارجي">
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">طريقة الدفع</label>
-                    <select name="payment_method" class="w-full rounded-xl border-slate-200 text-sm" required>
-                        <option value="cash">نقدي (Cash)</option>
-                        <option value="palestine_bank">بنك فلسطين</option>
-                        <option value="pal_pay">بال بي</option>
-                        <option value="jawwal_pay">جوال بي</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">رقم جوال المحفظة / التحويل</label>
-                    <input type="text" name="wallet_phone" class="w-full rounded-xl border-slate-200 text-sm" placeholder="059xxxxxxx">
-                </div>
-            </div>
-
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">الموظف المسؤول</label>
-                <select name="employee_id" class="w-full rounded-xl border-slate-200 text-sm" required>
-                    <option value="">اختر الموظف</option>
-                    @foreach($employees as $emp)
-                        <option value="{{ $emp->id }}">{{ $emp->username }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">رقم الفاتورة</label>
-                <input type="text" name="invoice_number" class="w-full rounded-xl border-slate-200 text-sm" required>
-            </div>
-
-            <div class="grid grid-cols-3 gap-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">الإجمالي</label>
-                    <input type="number" step="0.01" name="total" class="w-full rounded-xl border-slate-200 text-sm" min="0" required>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">المدفوع</label>
-                    <input type="number" step="0.01" name="paid_amount" value="0" class="w-full rounded-xl border-slate-200 text-sm" min="0" required>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">الحالة</label>
-                    <select name="status" class="w-full rounded-xl border-slate-200 text-sm" required>
-                        <option value="unpaid">غير مدفوعة</option>
-                        <option value="partial">جزئي</option>
-                        <option value="paid">مدفوعة</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="flex justify-end gap-2 pt-2">
-                <button type="button" onclick="closeModal('addModal')" class="px-4 py-2 bg-slate-100 text-slate-600 text-xs font-semibold rounded-xl">إلغاء</button>
-                <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl">حفظ</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Modal تعديل الفاتورة -->
+<!-- Modal تعديل بيانات الفاتورة (بدون المبالغ) -->
 <div id="editModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 hidden">
-    <div class="bg-white rounded-2xl p-6 w-full max-w-xl space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
-        <h3 class="text-lg font-bold text-slate-800">تعديل فاتورة المبيعات</h3>
-        
+    <div class="bg-white rounded-2xl p-6 w-full max-w-lg space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
+        <h3 class="text-lg font-bold text-slate-800">تعديل بيانات الفاتورة <span id="edit_invoice_label" class="text-slate-400"></span></h3>
+        <p class="text-xs text-slate-500">لتغيير المبالغ أو الأصناف استخدم «مرتجع» أو «تسجيل دفعة» من صفحة الفاتورة.</p>
+
         <form id="editForm" method="POST" class="space-y-4">
             @csrf
             @method('PUT')
 
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">المنظمة</label>
-                    <select name="organization_id" id="edit_organization_id" class="w-full rounded-xl border-slate-200 text-sm" required>
-                        <option value="">اختر المنظمة</option>
-                        @foreach($organizations as $org)
-                            <option value="{{ $org->id }}">{{ $org->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">الفرع</label>
-                    <select name="branch_id" id="edit_branch_id" class="w-full rounded-xl border-slate-200 text-sm" required>
-                        <option value="">اختر الفرع</option>
-                        @foreach($branches as $branch)
-                            <option value="{{ $branch->id }}">{{ $branch->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">العميل المسجّل</label>
+                <select name="customer_id" id="edit_customer_id" class="w-full rounded-xl border-slate-200 text-sm" onchange="fillCustomerName(this, 'edit_customer_name')">
+                    <option value="">بدون عميل مسجّل</option>
+                    @foreach($customers as $customer)
+                        <option value="{{ $customer->id }}" data-name="{{ $customer->name }}">{{ $customer->name }}</option>
+                    @endforeach
+                </select>
             </div>
 
             <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">العميل</label>
-                    <select name="customer_id" id="edit_customer_id" class="w-full rounded-xl border-slate-200 text-sm">
-                        <option value="">اختر العميل</option>
-                        @foreach($customers as $customer)
-                            <option value="{{ $customer->id }}">{{ $customer->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">اسم العميل (نصي)</label>
                     <input type="text" name="customer_name" id="edit_customer_name" class="w-full rounded-xl border-slate-200 text-sm">
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">طريقة الدفع</label>
-                    <select name="payment_method" id="edit_payment_method" class="w-full rounded-xl border-slate-200 text-sm" required>
-                        <option value="cash">نقدي (Cash)</option>
-                        <option value="palestine_bank">بنك فلسطين</option>
-                        <option value="pal_pay">بال بي</option>
-                        <option value="jawwal_pay">جوال بي</option>
-                    </select>
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">رقم جوال المحفظة / التحويل</label>
@@ -314,43 +186,9 @@
                 </div>
             </div>
 
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">الموظف المسؤول</label>
-                <select name="employee_id" id="edit_employee_id" class="w-full rounded-xl border-slate-200 text-sm" required>
-                    <option value="">اختر الموظف</option>
-                    @foreach($employees as $emp)
-                        <option value="{{ $emp->id }}">{{ $emp->username }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">رقم الفاتورة</label>
-                <input type="text" name="invoice_number" id="edit_invoice_number" class="w-full rounded-xl border-slate-200 text-sm" required>
-            </div>
-
-            <div class="grid grid-cols-3 gap-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">الإجمالي</label>
-                    <input type="number" step="0.01" name="total" id="edit_total" class="w-full rounded-xl border-slate-200 text-sm" min="0" required>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">المدفوع</label>
-                    <input type="number" step="0.01" name="paid_amount" id="edit_paid_amount" class="w-full rounded-xl border-slate-200 text-sm" min="0" required>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600, mb-1">الحالة</label>
-                    <select name="status" id="edit_status" class="w-full rounded-xl border-slate-200 text-sm" required>
-                        <option value="unpaid">غير مدفوعة</option>
-                        <option value="partial">جزئي</option>
-                        <option value="paid">مدفوعة</option>
-                    </select>
-                </div>
-            </div>
-
             <div class="flex justify-end gap-2 pt-2">
                 <button type="button" onclick="closeModal('editModal')" class="px-4 py-2 bg-slate-100 text-slate-600 text-xs font-semibold rounded-xl">إلغاء</button>
-                <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl">تحديث</button>
+                <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl">حفظ</button>
             </div>
         </form>
     </div>
@@ -360,28 +198,19 @@
     function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
     function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
-    // ملء اسم العميل تلقائياً عند اختياره من القائمة
     function fillCustomerName(selectElement, targetInputId) {
         let selectedOption = selectElement.options[selectElement.selectedIndex];
-        let customerName = selectedOption.getAttribute('data-name') || '';
-        document.getElementById(targetInputId).value = customerName;
+        let customerName = selectedOption.getAttribute('data-name');
+        if (customerName) document.getElementById(targetInputId).value = customerName;
     }
 
     function openEditModal(sale) {
-        document.getElementById('edit_organization_id').value = sale.organization_id;
-        document.getElementById('edit_branch_id').value = sale.branch_id;
+        document.getElementById('edit_invoice_label').textContent = sale.invoice_number;
         document.getElementById('edit_customer_id').value = sale.customer_id || '';
         document.getElementById('edit_customer_name').value = sale.customer_name || '';
-        document.getElementById('edit_payment_method').value = sale.payment_method || 'cash';
         document.getElementById('edit_wallet_phone').value = sale.wallet_phone || '';
-        document.getElementById('edit_employee_id').value = sale.employee_id;
-        document.getElementById('edit_invoice_number').value = sale.invoice_number;
-        document.getElementById('edit_total').value = sale.total;
-        document.getElementById('edit_paid_amount').value = sale.paid_amount;
-        document.getElementById('edit_status').value = sale.status;
-
         document.getElementById('editForm').action = `{{ url('sales') }}/${sale.id}`;
         openModal('editModal');
     }
 </script>
-@endsection
+@endsection

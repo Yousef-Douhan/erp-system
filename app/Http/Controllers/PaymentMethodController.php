@@ -21,12 +21,14 @@ class PaymentMethodController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'code' => 'required|string|unique:payment_methods,code',
+            'kind' => 'required|in:cash,bank,wallet',
             'color' => 'required|string',
         ]);
 
         PaymentMethod::create([
             'name' => $request->name,
             'code' => $request->code,
+            'kind' => $request->kind,
             'icon' => $request->icon,
             'color' => $request->color,
             'requires_wallet' => $request->has('requires_wallet'),
@@ -44,12 +46,14 @@ class PaymentMethodController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'code' => 'required|string|unique:payment_methods,code,' . $paymentMethod->id,
+            'kind' => 'required|in:cash,bank,wallet',
             'color' => 'required|string',
         ]);
 
         $paymentMethod->update([
             'name' => $request->name,
             'code' => $request->code,
+            'kind' => $request->kind,
             'icon' => $request->icon,
             'color' => $request->color,
             'requires_wallet' => $request->has('requires_wallet'),
