@@ -2,16 +2,24 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use LogicException;
 
+/**
+ * سجل التدقيق: يُكتب مرة واحدة ولا يُعدَّل ولا يُحذف، وكل صيدلية ترى سجلاتها فقط.
+ */
 class AuditLog extends Model
 {
-    use HasFactory, SoftDeletes;
+    use BelongsToTenant, HasFactory, SoftDeletes;
+
+    protected static ?string $tenantOrg = 'organization_id';
 
     protected $fillable = [
         'user_id',
+        'organization_id',
         'action',
         'table_name',
         'record_id',
@@ -24,6 +32,12 @@ class AuditLog extends Model
         'old_values' => 'array',
         'new_values' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        static::updating(fn () => throw new LogicException('سجل التدقيق لا يمكن تعديله.'));
+        static::deleting(fn () => throw new LogicException('سجل التدقيق لا يمكن حذفه.'));
+    }
 
     public function user()
     {

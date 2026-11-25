@@ -3,6 +3,9 @@
 namespace App\Traits;
 
 use App\Models\AuditLog;
+use App\Models\Branch;
+use App\Models\Organization;
+use App\Support\Tenancy;
 
 trait AuditLogsable
 {
@@ -41,13 +44,37 @@ trait AuditLogsable
 
         // الحقول من نوع array في AuditLog تتولى الترميز، لذلك نمرر مصفوفات (بدون json_encode مزدوج)
         AuditLog::create([
-            'user_id'    => auth()->id(),
-            'action'     => $action,
+            'user_id' => auth()->id(),
+            'organization_id' => self::auditOrganizationId($model),
+            'action' => $action,
             'table_name' => $model->getTable(),
-            'record_id'  => $model->getKey(),
+            'record_id' => $model->getKey(),
             'ip_address' => app()->runningInConsole() ? null : request()->ip(),
             'old_values' => $clean($oldValues),
             'new_values' => $clean($newValues),
         ]);
+    }
+
+    /**
+     * الصيدلية التي يتبعها السجل: صيدلية السجل المتأثر إن عُرفت، وإلا صيدلية المستخدم الحالي.
+     */
+    protected static function auditOrganizationId($model): ?int
+    {
+        if ($model instanceof Organization) {
+            return (int) $model->getKey();
+        }
+
+        if ($model->getAttribute('organization_id')) {
+            return (int) $model->getAttribute('organization_id');
+        }
+
+        if ($branchId = $model->getAttribute('branch_id')) {
+            $orgId = Tenancy::bypass(fn () => Branch::withTrashed()->whereKey($branchId)->value('organization_id'));
+            if ($orgId) {
+                return (int) $orgId;
+            }
+        }
+
+        return Tenancy::orgId();
     }
 }

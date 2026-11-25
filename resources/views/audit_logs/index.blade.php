@@ -62,14 +62,16 @@
                                 <td class="p-4 text-center space-x-2 space-x-reverse">
                                     <!-- زر عرض التفاصيل بشكل أنيق ككروت -->
                                     <button type="button"
-                                        onclick="showDetails('{{ $log->user->username ?? 'غير معروف' }}', '{{ $log->action }}', '{{ $log->table_name }}', '{{ $log->ip_address }}', `{{ is_array($log->old_values) ? json_encode($log->old_values, JSON_UNESCAPED_UNICODE) : $log->old_values }}`, `{{ is_array($log->new_values) ? json_encode($log->new_values, JSON_UNESCAPED_UNICODE) : $log->new_values }}`)"
+                                        data-log="{{ json_encode([
+                                            'user' => $log->user->username ?? 'غير معروف',
+                                            'action' => $log->action,
+                                            'table' => $log->table_name,
+                                            'ip' => $log->ip_address,
+                                            'old' => $log->old_values,
+                                            'new' => $log->new_values,
+                                        ], JSON_UNESCAPED_UNICODE) }}"
+                                        onclick="showDetails(JSON.parse(this.dataset.log))"
                                         class="text-indigo-600 hover:underline font-bold">التفاصيل</button>
-
-                                    <form action="{{ route('audit-logs.destroy', $log->id) }}" method="POST"
-                                        class="inline-block" onsubmit="return confirm('هل أنت متأكد من حذف هذا السجل؟')">
-                                        @csrf @method('DELETE')
-                                        <button type="submit" class="text-rose-600 hover:underline font-bold">حذف</button>
-                                    </form>
                                 </td>
                             </tr>
                         @empty
@@ -157,17 +159,24 @@
     </div>
 
     <script>
-        function showDetails(user, action, table, ip, oldVal, newVal) {
-            document.getElementById('modal-user').innerText = user;
-            document.getElementById('modal-action').innerText = action;
-            document.getElementById('modal-table').innerText = table;
-            document.getElementById('modal-ip').innerText = ip;
+        // القيم المسجلة قد تحتوي نصوصاً أدخلها المستخدمون، فتُهرَّب قبل وضعها في الصفحة
+        function escapeHtml(value) {
+            const div = document.createElement('div');
+            div.textContent = value === null || value === undefined ? '' : String(value);
+            return div.innerHTML;
+        }
+
+        function showDetails(log) {
+            document.getElementById('modal-user').innerText = log.user ?? '';
+            document.getElementById('modal-action').innerText = log.action ?? '';
+            document.getElementById('modal-table').innerText = log.table ?? '';
+            document.getElementById('modal-ip').innerText = log.ip ?? '';
 
             // عرض القيم القديمة بشكل أنيق
-            renderJsonData(oldVal, 'old-values-container', 'modal-old-content');
+            renderJsonData(log.old, 'old-values-container', 'modal-old-content');
 
             // عرض القيم الجديدة بشكل أنيق
-            renderJsonData(newVal, 'new-values-container', 'modal-new-content');
+            renderJsonData(log.new, 'new-values-container', 'modal-new-content');
 
             document.getElementById('show-modal').classList.remove('hidden');
         }
@@ -197,8 +206,8 @@
                     let displayVal = (typeof value === 'object' && value !== null) ? JSON.stringify(value) : value;
                     html += `
                     <div class="bg-white p-2.5 rounded-xl border border-slate-200/60 flex flex-col justify-between">
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">${key}</span>
-                        <span class="text-slate-800 font-semibold text-xs mt-0.5 break-all">${displayVal ?? '---'}</span>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">${escapeHtml(key)}</span>
+                        <span class="text-slate-800 font-semibold text-xs mt-0.5 break-all">${escapeHtml(displayVal ?? '---')}</span>
                     </div>
                 `;
                 }
@@ -206,7 +215,7 @@
                 contentDiv.innerHTML = html;
             } catch (e) {
                 container.classList.remove('hidden');
-                contentDiv.innerHTML = `<p class="text-slate-600 text-xs">${rawVal}</p>`;
+                contentDiv.innerHTML = `<p class="text-slate-600 text-xs">${escapeHtml(rawVal)}</p>`;
             }
         }
 
