@@ -5,7 +5,6 @@ namespace App\Support;
 use App\Models\Branch;
 use App\Models\User;
 use App\Models\Warehouse;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 
@@ -22,6 +21,7 @@ use Illuminate\Validation\ValidationException;
 class Tenancy
 {
     private static array $cache = [];
+
     private static int $bypass = 0;
 
     public const ADMIN_ROLE = 'Admin';
@@ -44,17 +44,17 @@ class Tenancy
         }
         $user = self::user();
 
-        return $user !== null && !self::isSuperAdmin($user);
+        return $user !== null && ! self::isSuperAdmin($user);
     }
 
     public static function isSuperAdmin(?User $user = null): bool
     {
         $user ??= self::user();
-        if (!$user) {
+        if (! $user) {
             return false;
         }
 
-        return self::$cache['admin:' . $user->id] ??= $user->hasRole(self::ADMIN_ROLE);
+        return self::$cache['admin:'.$user->id] ??= $user->hasRole(self::ADMIN_ROLE);
     }
 
     public static function orgId(): ?int
@@ -80,11 +80,11 @@ class Tenancy
             return [$id];
         }
         $org = self::orgId();
-        if (!$org) {
+        if (! $org) {
             return [];
         }
 
-        return self::$cache['branches:' . $org] ??= Branch::withoutGlobalScope('tenant')
+        return self::$cache['branches:'.$org] ??= Branch::withoutGlobalScope('tenant')
             ->where('organization_id', $org)->pluck('id')->map(fn ($v) => (int) $v)->all();
     }
 
@@ -94,17 +94,17 @@ class Tenancy
     public static function orgBranchIds(): array
     {
         $org = self::orgId();
-        if (!$org) {
+        if (! $org) {
             return [];
         }
 
-        return self::$cache['branches:' . $org] ??= Branch::withoutGlobalScope('tenant')
+        return self::$cache['branches:'.$org] ??= Branch::withoutGlobalScope('tenant')
             ->where('organization_id', $org)->pluck('id')->map(fn ($v) => (int) $v)->all();
     }
 
     public static function warehouseIds(): array
     {
-        $key = 'warehouses:' . implode(',', self::branchIds());
+        $key = 'warehouses:'.implode(',', self::branchIds());
 
         return self::$cache[$key] ??= Warehouse::withoutGlobalScope('tenant')
             ->whereIn('branch_id', self::branchIds() ?: [0])->pluck('id')->map(fn ($v) => (int) $v)->all();
@@ -135,7 +135,7 @@ class Tenancy
      */
     public static function constrain($query, ?string $orgColumn, ?string $branchColumn = null)
     {
-        if (!self::active()) {
+        if (! self::active()) {
             return $query;
         }
 
@@ -157,7 +157,7 @@ class Tenancy
      */
     public static function fill($model, ?string $orgColumn, ?string $branchColumn, bool $branchRequired = false): void
     {
-        if (!self::active()) {
+        if (! self::active()) {
             return;
         }
 
@@ -171,7 +171,7 @@ class Tenancy
             if (self::branchId()) {
                 $model->{$branchColumn} = self::branchId();
             } elseif ($value) {
-                if (!in_array((int) $value, self::branchIds(), true)) {
+                if (! in_array((int) $value, self::branchIds(), true)) {
                     throw ValidationException::withMessages([$branchColumn => 'الفرع المختار لا يتبع صيدليتك.']);
                 }
             } elseif ($branchRequired) {
@@ -181,18 +181,33 @@ class Tenancy
     }
 
     /**
-     * الفرع الافتراضي للعمليات (البيع، الجرد...): فرع المستخدم، وإلا أول فرع في صيدليته، وإلا أول فرع في النظام
+     * الفرع الافتراضي للعمليات (البيع، الجرد...): فرع المستخدم، وإلا أول فرع في صيدليته.
+     * الرجوع لأول فرع في النظام مسموح لمدير النظام وعمليات النظام الداخلية فقط،
+     * حتى لا تُسجَّل حركة مستخدم صيدلية في فرع صيدلية أخرى.
+     *
+     * @throws ValidationException إذا كان المستخدم تابعاً لصيدلية ليس لها فروع
      */
     public static function defaultBranchId(): ?int
     {
-        return self::branchId()
-            ?? (self::branchIds()[0] ?? null)
-            ?? (Branch::withoutGlobalScope('tenant')->value('id') ? (int) Branch::withoutGlobalScope('tenant')->value('id') : null);
+        $own = self::branchId() ?? (self::branchIds()[0] ?? null);
+        if ($own !== null) {
+            return $own;
+        }
+
+        if (self::active()) {
+            throw ValidationException::withMessages([
+                'branch_id' => 'لا يوجد فرع مرتبط بحسابك أو بصيدليتك. أضف فرعاً للصيدلية أولاً.',
+            ]);
+        }
+
+        $first = Branch::withoutGlobalScope('tenant')->value('id');
+
+        return $first ? (int) $first : null;
     }
 
     public static function describe(): string
     {
-        if (!self::user()) {
+        if (! self::user()) {
             return '';
         }
         if (self::isSuperAdmin()) {
@@ -201,6 +216,6 @@ class Tenancy
         $branch = self::branchId() ? Branch::withoutGlobalScopes()->whereKey(self::branchId())->value('name') : null;
         $org = self::orgId() ? \App\Models\Organization::withoutGlobalScopes()->whereKey(self::orgId())->value('name') : null;
 
-        return trim(($org ?? '') . ($branch ? ' — ' . $branch : ''), ' —');
+        return trim(($org ?? '').($branch ? ' — '.$branch : ''), ' —');
     }
 }

@@ -256,14 +256,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/trash', [\App\Http\Controllers\TrashController::class, 'index'])->name('trash.index');
     Route::post('/trash/{type}/{id}/restore', [\App\Http\Controllers\TrashController::class, 'restore'])->name('trash.restore')->whereNumber('id');
 
-    // ================= سجل التدقيق =================
+    // ================= سجل التدقيق (للقراءة فقط: لا تعديل ولا حذف) =================
     Route::middleware('permission:view_audit_logs')->group(function () {
         Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
         Route::get('/audit-logs/{audit_log}', [AuditLogController::class, 'show'])->name('audit-logs.show');
-        Route::delete('/audit-logs/{audit_log}', [AuditLogController::class, 'destroy'])->name('audit-logs.destroy')
-            ->middleware('role:Admin');
     });
 });
 
 // مسارات المصادقة الخاصة بـ Breeze
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';
